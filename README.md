@@ -5,7 +5,7 @@
 ## 启动
 
 需要 **Node.js 24+** 和 **Python 3.9+**。Windows 双击 `Start-Website.cmd`，首次启动自动安装 Node 依赖并构建。
-然后打开 **http://localhost:5193/**，保持启动窗口运行。按 Ctrl+C 停止。
+然后打开 [http://localhost:5193/](http://localhost:5193/)，保持启动窗口运行。按 Ctrl+C 停止。
 
 ```powershell
 npm ci
