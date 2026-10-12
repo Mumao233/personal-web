@@ -53,7 +53,7 @@ npm run build
 
 私有仓库：https://github.com/Mumao233/personal-web
 
-本次用户选择暂不授权 Git 推送，因此远端保留空仓库，本地保留完整代码。授权 Git 后可推送当前分支。
+此仓库保存整合网站的完整源码。克隆后按“启动”一节安装依赖并运行；本地私有数据库、上传文件、运行缓存和构建产物不包含在仓库中。
 完整站包含 Node/SQLite 与 Python 服务，不能仅把静态 HTML 上传 GitHub Pages。正式上线需支持这两个服务的主机、HTTPS 及持久数据目录。
 
 ## 来源与许可
