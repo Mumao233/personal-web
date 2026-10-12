@@ -1,0 +1,189 @@
+{
+  "source": "NOAA / NCEP GFS via NSF Unidata NCSS",
+  "url": "https://tds.scigw.unidata.ucar.edu/thredds/ncss/grid/grib/NCEP/GFS/Global_0p25deg/Best?var=u-component_of_wind_height_above_ground&var=v-component_of_wind_height_above_ground&var=Precipitation_rate_surface&var=Total_cloud_cover_entire_atmosphere&north=90&south=-90&west=0&east=360&horizStride=1&time=present&vertCoord=10&accept=netcdf3",
+  "validTime": "2026-10-03T09:00:00.000Z",
+  "rainTime": "2026-10-03T09:00:00.000Z",
+  "cloudTime": "2026-10-03T09:00:00.000Z",
+  "downloadedAt": "2026-10-03T09:32:31.443Z",
+  "width": 1440,
+  "height": 721,
+  "lon0": -180,
+  "lat0": -90,
+  "dLon": 0.25,
+  "dLat": 0.25,
+  "channels": [
+    "eastward wind m/s",
+    "northward wind m/s",
+    "precipitation rate mm/h"
+  ],
+  "nativeResolution": "0.25°",
+  "displayResolution": "0.25°",
+  "binary": "/weather/gfs-surface.bin",
+  "cloudBinary": "/weather/gfs-clouds.bin",
+  "license": "US government data; served by NSF Unidata",
+  "binaryParts": [
+    {
+      "url": "/weather/chunks/gfs-surface-e7a5485f41c951bf-00.bin",
+      "bytes": 524288,
+      "sha256": "e7a5485f41c951bffc7aae2b82c60a674427f6c6f7cefbd962b5ff80a0584ba0"
+    },
+    {
+      "url": "/weather/chunks/gfs-surface-d831cdfea0eb65a5-01.bin",
+      "bytes": 524288,
+      "sha256": "d831cdfea0eb65a54c7d01a2eb3cda7de31ffa8908490f1330eb0af24b11668f"
+    },
+    {
+      "url": "/weather/chunks/gfs-surface-eff8e68c516c4ca2-02.bin",
+      "bytes": 524288,
+      "sha256": "eff8e68c516c4ca2fd18dc039f807f89384350a6aa3962700c3772f22590cc2b"
+    },
+    {
+      "url": "/weather/chunks/gfs-surface-99947e6a0a305ec8-03.bin",
+      "bytes": 524288,
+      "sha256": "99947e6a0a305ec80af49cf5bfcc9d6f12e7c218b24d4619ba729507da209986"
+    },
+    {
+      "url": "/weather/chunks/gfs-surface-de43a3bdf5172dcf-04.bin",
+      "bytes": 524288,
+      "sha256": "de43a3bdf5172dcf58fe16357c8c04eddf3b0128f5b3580e9ef1891cca4c4e00"
+    },
+    {
+      "url": "/weather/chunks/gfs-surface-2d65ec5b32880276-05.bin",
+      "bytes": 524288,
+      "sha256": "2d65ec5b32880276b592bc9e4a190469bb84e7958f9080706192ff09409ca84a"
+    },
+    {
+      "url": "/weather/chunks/gfs-surface-d098755244816ecb-06.bin",
+      "bytes": 524288,
+      "sha256": "d098755244816ecbe17d5b81c4319071cdc4f490960aa0614296d662597be38e"
+    },
+    {
+      "url": "/weather/chunks/gfs-surface-b9d454741cbcf871-07.bin",
+      "bytes": 524288,
+      "sha256": "b9d454741cbcf87162390212d8d59a6971ab10f0548afc20d7236e9e846fb635"
+    },
+    {
+      "url": "/weather/chunks/gfs-surface-5bb4bd800ddda487-08.bin",
+      "bytes": 524288,
+      "sha256": "5bb4bd800ddda487c18f4f474aae0d126637da60a04a97bbf528ba7df0ed8a41"
+    },
+    {
+      "url": "/weather/chunks/gfs-surface-a94fd6884af2faf7-09.bin",
+      "bytes": 524288,
+      "sha256": "a94fd6884af2faf716a08cc9e1349cb8db81070735c481f80427a8d5151ebe4c"
+    },
+    {
+      "url": "/weather/chunks/gfs-surface-9c9fec49a7c918dc-10.bin",
+      "bytes": 524288,
+      "sha256": "9c9fec49a7c918dcffd5026bce1980f2c105e61869b72d0d39b8418437c029f3"
+    },
+    {
+      "url": "/weather/chunks/gfs-surface-b29a955546aa4096-11.bin",
+      "bytes": 524288,
+      "sha256": "b29a955546aa4096bfdbeccaf4b1a7d4702635bfa043ece2225a50cfbff930c5"
+    },
+    {
+      "url": "/weather/chunks/gfs-surface-9414b20ba74e6809-12.bin",
+      "bytes": 524288,
+      "sha256": "9414b20ba74e68091ae8dc30417c8c66ee01c01cb7877a4a8b3f92e8949cfc03"
+    },
+    {
+      "url": "/weather/chunks/gfs-surface-3dc84dfa865b5879-13.bin",
+      "bytes": 524288,
+      "sha256": "3dc84dfa865b5879fb0b84ba023734f5ae931c6695455e3509a3963d58d25a05"
+    },
+    {
+      "url": "/weather/chunks/gfs-surface-72e693e57fa699ad-14.bin",
+      "bytes": 524288,
+      "sha256": "72e693e57fa699ad5d04bc503f257d7177975c5de9c0b083ca463d59ef4f8b06"
+    },
+    {
+      "url": "/weather/chunks/gfs-surface-3451ee2a6193fa19-15.bin",
+      "bytes": 524288,
+      "sha256": "3451ee2a6193fa198b1252188c96ab08b685c91fe1e35cd191f6b7d57eae478f"
+    },
+    {
+      "url": "/weather/chunks/gfs-surface-d5452a1501e8302f-16.bin",
+      "bytes": 524288,
+      "sha256": "d5452a1501e8302f17f2b1de584ac10fa3124c8a4e74daf06dbfd34c8f2aa0ba"
+    },
+    {
+      "url": "/weather/chunks/gfs-surface-11abc214ca11d6d6-17.bin",
+      "bytes": 524288,
+      "sha256": "11abc214ca11d6d62a9805751612c421cf494438dde45a6c764333b50153286d"
+    },
+    {
+      "url": "/weather/chunks/gfs-surface-fc42a33f0534bf63-18.bin",
+      "bytes": 524288,
+      "sha256": "fc42a33f0534bf63a3e284dd0a3ca100695103b08a6286d0d4da748c719599f8"
+    },
+    {
+      "url": "/weather/chunks/gfs-surface-1196ff017f96c3b9-19.bin",
+      "bytes": 524288,
+      "sha256": "1196ff017f96c3b9d000cec9c5ff6eede83836b6d56eb776da0de57d4e4254e3"
+    },
+    {
+      "url": "/weather/chunks/gfs-surface-3025ec5a00e8da2a-20.bin",
+      "bytes": 524288,
+      "sha256": "3025ec5a00e8da2a915c021a102e2b4b215e13786b8861c4f096eadfc5436fb4"
+    },
+    {
+      "url": "/weather/chunks/gfs-surface-34d445355469ecfa-21.bin",
+      "bytes": 524288,
+      "sha256": "34d445355469ecfa5b89e685588a8ae69ee621c34b35608b95ff5ce9249dfe0f"
+    },
+    {
+      "url": "/weather/chunks/gfs-surface-010e81c5025dbd25-22.bin",
+      "bytes": 524288,
+      "sha256": "010e81c5025dbd25c1820e3ffebd63c168e262d5441d0c373f75305a809b8769"
+    },
+    {
+      "url": "/weather/chunks/gfs-surface-410403a7a73daf17-23.bin",
+      "bytes": 400256,
+      "sha256": "410403a7a73daf179d721f2a3701e1f1f0237764b14e4d8fad312d6194b44980"
+    }
+  ],
+  "cloudBinaryParts": [
+    {
+      "url": "/weather/chunks/gfs-clouds-1d76982db08a69ba-00.bin",
+      "bytes": 524288,
+      "sha256": "1d76982db08a69ba637e01b222b3bc41be81b1863ec62c58482829e3a2818bbc"
+    },
+    {
+      "url": "/weather/chunks/gfs-clouds-2db9b6774f0c202d-01.bin",
+      "bytes": 524288,
+      "sha256": "2db9b6774f0c202d3112ea59b7cfa161db28ce33d9d2718f722db9c87bbe665d"
+    },
+    {
+      "url": "/weather/chunks/gfs-clouds-4ccfb31fd787d6d2-02.bin",
+      "bytes": 524288,
+      "sha256": "4ccfb31fd787d6d20d7c2eefee3f9dc72bb18b0775b155eb0688a5c624dd9fb8"
+    },
+    {
+      "url": "/weather/chunks/gfs-clouds-f47206457c34703b-03.bin",
+      "bytes": 524288,
+      "sha256": "f47206457c34703bfb3b549243af094a4608326d2c0be14b1056a6973e6787ec"
+    },
+    {
+      "url": "/weather/chunks/gfs-clouds-d54745b678384bcc-04.bin",
+      "bytes": 524288,
+      "sha256": "d54745b678384bcc638b214222b6a758adf64ff75407e5dc839e786bb261ab2c"
+    },
+    {
+      "url": "/weather/chunks/gfs-clouds-3f19ada4d47981a4-05.bin",
+      "bytes": 524288,
+      "sha256": "3f19ada4d47981a4987fed223f188c75ac50815f27a08a7fb2f7d9731d372c5e"
+    },
+    {
+      "url": "/weather/chunks/gfs-clouds-a02c495474d951d4-06.bin",
+      "bytes": 524288,
+      "sha256": "a02c495474d951d4467469c6b010a37438db9522220ca3fc9678fd1a95216814"
+    },
+    {
+      "url": "/weather/chunks/gfs-clouds-a81d3af363f8ade9-07.bin",
+      "bytes": 482944,
+      "sha256": "a81d3af363f8ade9a6a5584f04227cbbce3a662c85478bb3be796ab79c987036"
+    }
+  ],
+  "refreshFailed": true
+}

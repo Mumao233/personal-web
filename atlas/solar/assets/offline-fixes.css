@@ -1,0 +1,3 @@
+/* The original topbar disables pointer events on its container. Its floating
+   guide must explicitly receive clicks, like the navigation row does. */
+.atlas .topbar > .guide { pointer-events: auto; }

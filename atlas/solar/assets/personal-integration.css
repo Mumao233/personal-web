@@ -1,0 +1,49 @@
+@import url('/fonts/noto-sans-sc.css');
+/* Shared personal-space typography. Numeric readings retain their mono face. */
+:root {
+  --sans: "Noto Sans SC", "AtlasSans", "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+body, button, input, select, textarea { font-family: var(--sans); }
+.atlas.atlas.atlas.atlas :is(.navbtn,.navmenu button,.nav-menu button,.chip,.filters__item,.search__item,.catalog-list button,.mobilebar__btn,.music-toggle,.view-switch button,.author-panel,.guide,.t-cn) {
+  font-family: var(--sans);
+  letter-spacing: .035em;
+  font-weight: 400;
+}
+.atlas.atlas.atlas.atlas :is(.navbtn,.mobilebar__btn,.chip,.music-toggle) { font-size: 12px; }
+.atlas.atlas.atlas.atlas .masthead__title { font-weight: 500; letter-spacing: .08em; }
+.atlas.atlas.atlas.atlas .masthead__sub { font-family: var(--sans); font-size: 12px; letter-spacing: .055em; }
+.atlas.atlas.atlas.atlas :is(.label__text,.label__sub) { font-family: var(--sans); letter-spacing: .025em; text-shadow: 0 1px 5px #000, 0 0 3px #000; }
+.atlas.atlas.atlas.atlas .label__text { font-size: 11px; font-weight: 500; }
+.atlas.atlas.atlas.atlas .label__sub { font-size: 10px; line-height: 1.45; }
+.atlas.atlas.atlas.atlas .label--planet .label__text { font-size: 13px; letter-spacing: .045em; }
+.atlas.atlas.atlas.atlas :is(.archive__body,.archive p,.reading-chapter p,.record-story p) { font-family: var(--sans); font-size: 14px; line-height: 1.85; letter-spacing: .015em; }
+.personal-return {
+  flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center;
+  min-height: 36px; padding: 7px 12px; border: 1px solid #c58a5559;
+  border-radius: 12px; background: #0d0c0be8; color: #e7e1d5;
+  font: 400 12px/1.4 var(--sans); letter-spacing: .02em; text-decoration: none;
+  pointer-events: auto; white-space: nowrap; transition: border-color .2s, background .2s;
+}
+.personal-return:hover { background: #c58a5526; border-color: #c58a55; }
+.personal-return:focus-visible { outline: 2px solid #c58a55; outline-offset: 3px; }
+.personal-return--fallback { position: fixed; z-index: 100; bottom: max(18px, env(safe-area-inset-bottom)); left: 18px; }
+.personal-return[hidden] { display: none; }
+@media (max-width: 759px) {
+  .atlas.atlas.atlas.atlas[data-focus="comet"] .archive[data-record-kind="comet"] {
+    top: auto !important; bottom: calc(64px + env(safe-area-inset-bottom)) !important;
+    left: 8px !important; right: 8px !important; width: auto !important;
+    height: 42dvh !important; max-height: 42dvh !important; min-height: 0 !important;
+    padding: 0 16px 22px !important; overflow-y: auto !important;
+    border-radius: 16px !important; overscroll-behavior: contain;
+  }
+  .atlas.atlas.atlas.atlas[data-focus="comet"] .archive__top {
+    position: sticky; top: 0; z-index: 2; min-height: 48px; padding: 8px 0;
+    background: #101211; border-bottom: 1px solid #c58a5538;
+  }
+  .atlas.atlas.atlas.atlas[data-focus="comet"] .archive__hero { margin: 16px 0 !important; padding: 0 0 0 12px !important; }
+  .atlas.atlas.atlas.atlas[data-focus="comet"] .archive__name { font-size: 25px !important; line-height: 1.4 !important; }
+  .atlas.atlas.atlas.atlas[data-focus="comet"] .archive__section { margin-top: 18px !important; }
+  .personal-return { min-height: 40px; padding: 7px 9px; font-size: 11px; }
+  .personal-return--fallback { bottom: calc(76px + env(safe-area-inset-bottom)); left: 12px; }
+  .atlas.atlas.atlas.atlas .label--planet .label__text { font-size: 12px; }
+}

@@ -1,0 +1,27 @@
+{
+  "layer": "SMAP_L3_Sea_Surface_Salinity_CAP_8Day_RunningMean",
+  "validDate": "2026-10-07",
+  "sourceDate": "2026-10-07",
+  "latestAvailableDate": "2026-10-07",
+  "fetchedAt": "2026-10-12T06:27:38Z",
+  "checkedAt": "2026-10-12T06:27:38Z",
+  "requestUrl": "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetMap&LAYERS=SMAP_L3_Sea_Surface_Salinity_CAP_8Day_RunningMean&STYLES=&SRS=EPSG%3A4326&BBOX=-180%2C-90%2C180%2C90&WIDTH=1024&HEIGHT=512&FORMAT=image%2Fpng&TRANSPARENT=TRUE&TIME=2026-10-07",
+  "legendSourceUrl": "https://gibs.earthdata.nasa.gov/legends/SMAP_Sea_Surface_Salinity_H.png",
+  "capabilitiesUrl": "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetCapabilities",
+  "imageSha256": "ec49f7cf4e2536d0c71d42ddae10d4cbcc9566bb4076776d59c98f964a69aa07",
+  "legendSha256": "429e035e315cb6ec7694c14c06a931d26a89b9f3a81a8cb6a94545ab4210846f",
+  "dimensions": [
+    1024,
+    512
+  ],
+  "bbox": [
+    -180,
+    -90,
+    180,
+    90
+  ],
+  "crs": "EPSG:4326",
+  "transparentPixels": 395730,
+  "visiblePixels": 128558,
+  "noData": "transparent; no gap filling or simulated values"
+}

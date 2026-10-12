@@ -1,0 +1,27 @@
+{
+  "layer": "MODIS_Aqua_L2_Chlorophyll_A",
+  "validDate": "2026-10-11",
+  "sourceDate": "2026-10-11",
+  "latestAvailableDate": "2026-10-11",
+  "fetchedAt": "2026-10-12T06:27:38Z",
+  "checkedAt": "2026-10-12T06:27:38Z",
+  "requestUrl": "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetMap&LAYERS=MODIS_Aqua_L2_Chlorophyll_A&STYLES=&SRS=EPSG%3A4326&BBOX=-180%2C-90%2C180%2C90&WIDTH=1024&HEIGHT=512&FORMAT=image%2Fpng&TRANSPARENT=TRUE&TIME=2026-10-11",
+  "legendSourceUrl": "https://gibs.earthdata.nasa.gov/legends/MODIS_Chlorophyll_H.png",
+  "capabilitiesUrl": "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetCapabilities",
+  "imageSha256": "d814d66a6605e73e74721c59d968cf8100762f3464d0f156dc79780f9320d3a1",
+  "legendSha256": "b64a5dada5adf06bbf8a34c8dccf59495db8730c0b01fb6f87d4a05fb4091e3b",
+  "dimensions": [
+    1024,
+    512
+  ],
+  "bbox": [
+    -180,
+    -90,
+    180,
+    90
+  ],
+  "crs": "EPSG:4326",
+  "transparentPixels": 470072,
+  "visiblePixels": 54216,
+  "noData": "transparent; no gap filling or simulated values"
+}

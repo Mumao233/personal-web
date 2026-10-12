@@ -1,0 +1,15 @@
+{
+  "checks": [
+    "Default OFF: zero getUserMedia calls and zero WASM/model/worker requests.",
+    "Permission denied: readable error, OFF restored, no model download.",
+    "Actual MediaPipe worker + local WASM + official model initialize and infer blank frame successfully.",
+    "Rendered scene camera responds to rotate, pan and zoom hand-control bridge.",
+    "Actual gesture selection bridge picks Jupiter at its rendered screen coordinates.",
+    "Full switch ON/OFF with synthetic stream: actual local inference runs; OFF stops every track and clears preview.",
+    "390px mobile panel stays inside viewport."
+  ],
+  "notes": [
+    "Synthetic canvas/video only; no physical camera requested."
+  ],
+  "pageErrors": []
+}

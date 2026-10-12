@@ -1,0 +1,101 @@
+const {chromium} = require('playwright');
+const fs = require('fs'), path = require('path'), assert = require('assert');
+const base = process.env.ATLAS_URL || 'http://127.0.0.1:8766';
+const output = path.join(__dirname, '../evidence/live-weather-validation.json');
+(async () => {
+  const report = {date: new Date().toISOString(), checks: [], responses: [], errors: [], requestFailures: []};
+  const browser = await chromium.launch({channel: 'chrome', headless: true});
+  const context = await browser.newContext({viewport: {width: 1440, height: 1000}});
+  const page = await context.newPage();
+  page.setDefaultTimeout(25000);
+  let intentionalFailure = false;
+  page.on('console', m => {if(m.type() === 'error' && !intentionalFailure) report.errors.push(m.text());});
+  page.on('pageerror', e => report.errors.push(String(e)));
+  page.on('requestfailed', r => {if(!intentionalFailure) report.requestFailures.push({url:r.url(), error:r.failure()});});
+  page.on('response', r => {
+    if(r.url().includes('meteo') || r.url().includes('/__local/weather/')) report.responses.push({url:r.url(), status:r.status()});
+    if(r.status() >= 400 && !intentionalFailure) report.errors.push(r.status() + ' ' + r.url());
+  });
+  const check = (name, detail) => report.checks.push({name, passed:true, ...detail});
+  try {
+    await page.goto(base + '/?view=globe&from=solar');
+    await page.locator('.cesium-widget canvas').waitFor();
+    await page.locator('button').filter({hasText:/^图层/}).click();
+    await page.locator('button').filter({hasText:/查询位置气象与海流/}).click();
+    await page.getByRole('heading', {name:'当前位置预报',exact:true}).waitFor();
+    const point = await page.locator('.atlas-point-forecast').innerText();
+    assert(point.includes('在线预报') && !point.includes('Invalid Date'));
+    check('Real online point weather and marine render with UTC-derived time and sources', {text:point});
+    await page.waitForFunction(() => {
+      const p=document.querySelector('.atlas-weather-controls');
+      return p && p.textContent.includes('最新取得') && !p.textContent.includes('正在检查');
+    });
+    const meta = await page.evaluate(async () => (await fetch('/__local/weather/gfs-surface.json?offline=1')).json());
+    assert(meta.width===1440 && meta.height===721 && meta.weatherStatus.mode==='live');
+    assert(meta.binaryParts.length && meta.cloudBinaryParts.length);
+    check('Global GFS wind/rain/cloud forecast metadata and verified binary grids load', {validTime:meta.validTime, fetchedAt:meta.downloadedAt, status:meta.weatherStatus});
+    await page.screenshot({path:path.join(__dirname,'../evidence/live-point-weather.png')});
+    const before=report.responses.filter(r=>r.url.includes('meteo')).length;
+    await page.locator('.coordinate-form button').click();
+    await page.getByRole('heading',{name:'当前位置预报',exact:true}).waitFor();
+    assert(report.responses.filter(r=>r.url.includes('meteo')).length >= before+2);
+    check('Same-coordinate explicit refresh requests both providers');
+    await page.getByLabel('经度',{exact:true}).fill('116.4');
+    await page.getByLabel('纬度',{exact:true}).fill('39.9');
+    await page.locator('.coordinate-form button').click();
+    await page.getByRole('heading',{name:'当前位置预报',exact:true}).waitFor();
+    const inland=await page.locator('.atlas-point-forecast').innerText();
+    assert(inland.includes('此处无数据') && inland.includes('在线预报'));
+    check('Inland weather survives genuine null marine fields', {text:inland});
+    const saved=await page.evaluate(()=>JSON.parse(localStorage.getItem('atlas-point-forecast-v1')));
+    intentionalFailure=true;
+    await context.route('https://**/*',r=>r.abort('internetdisconnected'));
+    await page.locator('.coordinate-form button').click();
+    await page.getByRole('heading',{name:'当前位置预报',exact:true}).waitFor();
+    const cached=await page.locator('.atlas-point-forecast').innerText();
+    assert(cached.includes('缓存预报') && cached.includes('网络更新失败'));
+    check('Network failure returns genuine cached point data with failure and original timestamps', {text:cached});
+    await page.getByRole('checkbox',{name:'自动更新数据',exact:true}).uncheck();
+    await page.getByRole('heading',{name:'当前位置预报',exact:true}).waitFor();
+    assert((await page.locator('.atlas-point-forecast').innerText()).includes('离线模式'));
+    assert((await page.evaluate(()=>JSON.parse(localStorage.getItem('atlas-point-forecast-v1')))).entries['116.4000,39.9000'].weather.meta.fetchedAt===saved.entries['116.4000,39.9000'].weather.meta.fetchedAt);
+    check('Explicit offline mode preserves original cached fetch time');
+    await page.getByLabel('经度',{exact:true}).fill('10');
+    await page.getByLabel('纬度',{exact:true}).fill('10');
+    await page.locator('.coordinate-form button').click();
+    await page.getByText('暂时无法取得该位置预报，也没有可用缓存。可重试，或查看已保存的全球气象图层。').waitFor();
+    check('Uncached offline coordinate displays unavailable instead of invented values');
+    await context.unroute('https://**/*');
+    intentionalFailure=false;
+    await page.keyboard.press('Escape');
+    await page.locator('button').filter({hasText:/^图层/}).click();
+    await page.locator('button').filter({hasText:/全部图层与来源/}).click();
+    await page.getByRole('checkbox',{name:'自动更新数据',exact:true}).check();
+    await page.waitForFunction(()=>document.querySelector('.atlas-weather-controls')?.textContent.includes('最新取得'));
+    for(const [name, label] of [['wind', /10 米风场/], ['rain', /^降水/], ['cloudcover', /云量预报/]]) {
+      const toggle=page.getByRole('switch',{name:label});
+      await toggle.click();
+      await page.waitForTimeout(1700);
+      const text=await page.locator('body').innerText();
+      assert(text.includes('2026-10-12') && text.includes('GFS'));
+      const first=await page.locator('.cesium-widget canvas').screenshot();
+      await page.waitForTimeout(900);
+      const second=await page.locator('.cesium-widget canvas').screenshot();
+      await page.screenshot({path:path.join(__dirname,'../evidence/live-global-'+name+'.png')});
+      if(name==='wind')assert(!first.equals(second),'Wind particle animation did not change');
+      check('Original renderer displays live global '+name+' layer', {text:text.slice(-2500), framesDiffer:!first.equals(second)});
+      await toggle.click();
+    }
+    await page.locator('[data-action="refresh-global-weather"]').click();
+    await page.waitForFunction(()=>!document.querySelector('[data-action="refresh-global-weather"]')?.disabled);
+    check('Global refresh button completes using bounded background update');
+    assert(!report.errors.length, JSON.stringify(report.errors));
+    report.passed=true;
+  } catch(error) {report.passed=false;report.failure=String(error);report.stack=error.stack;}
+  finally {
+    fs.writeFileSync(output,JSON.stringify(report,null,2));
+    console.log(JSON.stringify(report));
+    await browser.close();
+    if(!report.passed)process.exitCode=1;
+  }
+})();

@@ -1,0 +1,11 @@
+node_modules/
+dist/
+/data/
+.env
+*.log
+atlas/.runtime/
+atlas/evidence/
+**/__pycache__/
+*.pyc
+deliveries/
+.qa/

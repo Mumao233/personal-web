@@ -1,0 +1,22 @@
+HAND GESTURE BRIDGE (only inspect_site_sources edits solar.js)
+
+Camera: in n7() camera useEffect, after X=J=>{...} ends, the existing text is
+    };window.addEventListener("atlas-camera",X),
+Replace this once with:
+    };const gestureCamera=event=>{const q=event.detail||{};if(q.action==="release"){d.current.reset();return}if(q.action==="activate"){if(B.getState().mode==="INTRO")B.setState({mode:"ATLAS"});return}if(!["rotate","pan","zoom"].includes(q.action))return;const dx=Number(q.dx)||0,dy=Number(q.dy)||0;if(Math.abs(dx)>.2||Math.abs(dy)>.2)return;d.current.reset();p.current=null;g.current=null;kt.setState({observation:null,orbit:!1});if(q.action==="rotate"){const st=B.getState();st.setView("ORBIT3D");st.setAtlasPose(!1);vs(1);c.current=!0;r.current.yaw-=dx*3.4;r.current.pitch=Ue.clamp(r.current.pitch+dy*2.7,-1.35,1.35)}else if(q.action==="pan"){const k=O()*2/Math.max(n.height,1),right=new z().setFromMatrixColumn(t.matrixWorld,0),up=new z().setFromMatrixColumn(t.matrixWorld,1);s.current.addScaledVector(right,-dx*n.width*k);s.current.addScaledVector(up,dy*n.height*k)}else{const scale=Number(q.scale);if(!Number.isFinite(scale)||scale<.75||scale>1.33)return;x.current=!0;r.current.height=Ue.clamp(r.current.height/scale,1.5,B.getState().focusKind==="COMET"?6000:1520)}};window.addEventListener("atlas-gesture",gestureCamera);window.addEventListener("atlas-camera",X),
+
+Camera cleanup: in the same effect's cleanup return()=>{window.removeEventListener("atlas-camera",X),
+insert before the existing remove:
+    window.removeEventListener("atlas-gesture",gestureCamera);
+
+Picking: in s7() second effect, before its return window.addEventListener("pointermove",u),
+append after the h=m=>{...} function ends:
+    const gestureSelect=event=>{const q=event.detail||{},px=Number(q.x),py=Number(q.y);if(!Number.isFinite(px)||!Number.isFinite(py)||B.getState().mode==="INTRO")return;const hit=o7(s.current,px,py),st=B.getState();if(hit?.kind==="planet")st.focusPlanet(hit.id);else if(hit?.kind==="moon")st.focusMoon(hit.id);else if(hit?.kind==="object")st.select(hit.id);else if(hit?.kind==="sun")st.focusPlanet("sun");else if(hit?.kind==="comet")st.focusComet(hit.id);else if(hit?.kind==="region")st.focusRegion(hit.id);window.dispatchEvent(new CustomEvent("atlas-gesture-result",{detail:{selected:!!hit,id:hit?.id??null}}))};window.addEventListener("atlas-gesture-select",gestureSelect);
+
+Picking cleanup: in this same effect's ()=>{window.removeEventListener("pointermove",u),
+insert before the existing remove:
+    window.removeEventListener("atlas-gesture-select",gestureSelect);
+
+Camera dx/dy are fractions of viewport per frame, mirrored to match video preview.
+Zoom scale >1 brings the camera in. Release clears inertia immediately.
+No pointer synthesis / pointer capture errors, no mouse clicks on unrelated UI.

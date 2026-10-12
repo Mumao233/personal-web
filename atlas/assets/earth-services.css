@@ -1,0 +1,7 @@
+.atlas-service-detail{padding:0 4px 8px;border-bottom:1px solid rgba(150,205,220,.1)}
+.atlas-service-detail .panel__hint{font-size:11px;line-height:1.65;overflow-wrap:anywhere}
+.atlas-service-legend{margin:8px 0;background:#f5f6f7;padding:8px;border-radius:4px;color:#273843}
+.atlas-service-legend img{display:block;width:100%;height:auto;object-fit:contain}
+.atlas-service-legend figcaption{font-size:9px;line-height:1.4;margin-top:5px}
+.atlas-eez-legend{display:block;max-width:100%;height:auto;background:white;margin:8px 0;padding:5px;border-radius:4px}
+.atlas-services-overview{border-top:1px solid rgba(150,205,220,.16);padding-top:12px}

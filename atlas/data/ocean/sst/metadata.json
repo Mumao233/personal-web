@@ -1,0 +1,27 @@
+{
+  "layer": "GHRSST_L4_MUR_Sea_Surface_Temperature",
+  "validDate": "2026-10-10",
+  "sourceDate": "2026-10-10",
+  "latestAvailableDate": "2026-10-10",
+  "fetchedAt": "2026-10-12T06:27:37Z",
+  "checkedAt": "2026-10-12T06:27:37Z",
+  "requestUrl": "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetMap&LAYERS=GHRSST_L4_MUR_Sea_Surface_Temperature&STYLES=&SRS=EPSG%3A4326&BBOX=-180%2C-90%2C180%2C90&WIDTH=1024&HEIGHT=512&FORMAT=image%2Fpng&TRANSPARENT=TRUE&TIME=2026-10-10",
+  "legendSourceUrl": "https://gibs.earthdata.nasa.gov/legends/GHRSST_Sea_Surface_Temperature_H.png",
+  "capabilitiesUrl": "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetCapabilities",
+  "imageSha256": "599cdbce7b9b9bd285c0ff782572e2c7735de6aeef9ae6080c49359ebd12051b",
+  "legendSha256": "36ec4328c006bb420a01b1b9f4d2631e57d263c213ae61028226ceaa66ffad89",
+  "dimensions": [
+    1024,
+    512
+  ],
+  "bbox": [
+    -180,
+    -90,
+    180,
+    90
+  ],
+  "crs": "EPSG:4326",
+  "transparentPixels": 230456,
+  "visiblePixels": 293832,
+  "noData": "transparent; no gap filling or simulated values"
+}
