@@ -1372,6 +1372,10 @@ input[type="radio"] {
 }
 
 /* Keep local map controls clear of the persistent exploration entry. */
+.submission-fields { border: 0; padding: 0; margin: 0; min-width: 0; }
+.module-recovery { padding: 24px; border: 1px solid #726044; border-radius: 12px; background: #14120f; }
+.module-recovery p { margin: 0 0 12px; }
+.module-recovery-quiet { position: fixed; right: 16px; bottom: 16px; z-index: 30; max-width: min(340px, calc(100vw - 32px)); }
 .globe-controls button {
   width: 44px;
   height: 44px;

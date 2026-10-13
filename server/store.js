@@ -27,6 +27,18 @@ export const put = (kind, item) => {
 };
 export const remove = (kind, id) =>
   db.prepare("DELETE FROM records WHERE kind=? AND id=?").run(kind, id);
+// All callbacks are synchronous: never hold a database transaction across I/O.
+export function transaction(callback) {
+  db.exec("BEGIN IMMEDIATE");
+  try {
+    const result = callback();
+    db.exec("COMMIT");
+    return result;
+  } catch (error) {
+    db.exec("ROLLBACK");
+    throw error;
+  }
+}
 export const setting = (key, fallback = null) => {
   const r = db.prepare("SELECT value FROM settings WHERE key=?").get(key);
   return r ? JSON.parse(r.value) : fallback;

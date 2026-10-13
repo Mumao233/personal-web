@@ -314,7 +314,14 @@ test("matrix summaries and completion counts accept filtered submissions and leg
 });
 
 let child, dir, cookie, base;
+const definitionVersions = new Map();
 async function call(path, method = "GET", body, admin = false) {
+  const surveyIdForSubmit = path.match(/^\/surveys\/([^/]+)\/submit$/)?.[1];
+  if (surveyIdForSubmit)
+    body = {
+      definitionVersion: definitionVersions.get(surveyIdForSubmit),
+      ...body,
+    };
   const response = await fetch(base + "/api" + path, {
     method,
     headers: {
@@ -323,7 +330,10 @@ async function call(path, method = "GET", body, admin = false) {
     },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
-  return { status: response.status, data: await response.json(), response };
+  const data = await response.json();
+  if (data.id && data.definitionVersion)
+    definitionVersions.set(data.id, data.definitionVersion);
+  return { status: response.status, data, response };
 }
 before(async () => {
   dir = await mkdtemp(join(tmpdir(), "personal-space-survey-test-"));
@@ -468,11 +478,11 @@ test("API computes completion, matrix statistics, filtered export and keeps hist
   assert.equal(sheet.rowCount, 2);
   assert.equal(sheet.getRow(2).getCell(3).value, "完整完成");
   const headers = sheet.getRow(1).values;
-  assert.ok(headers.includes("Experience · Useful"));
-  assert.equal(
-    sheet.getRow(2).getCell(headers.indexOf("Experience · Useful")).value,
-    "Neutral",
+  const historicalColumn = headers.findIndex((header) =>
+    String(header).startsWith("Experience · Useful"),
   );
+  assert.ok(historicalColumn > 0);
+  assert.equal(sheet.getRow(2).getCell(historicalColumn).value, "Neutral");
   const invalid = await call(`/surveys/${id}/submit`, "POST", {
     answers: {
       gate: "no",

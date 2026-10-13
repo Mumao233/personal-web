@@ -8,33 +8,8 @@ import {
   ArrowUpRight,
 } from "@phosphor-icons/react";
 import { date } from "./api";
-export function cluster(stories, far) {
-  if (!far) return stories.map((s) => ({ ...s, items: [s], count: 1 }));
-  const groups = [];
-  for (const s of stories) {
-    let g = groups.find(
-      (g) =>
-        (s.city && s.city === g.city) ||
-        Math.hypot(
-          Number(s.lat) - g.lat,
-          (Number(s.lng) - g.lng) * Math.cos((Number(s.lat) * Math.PI) / 180),
-        ) < 0.55,
-    );
-    if (!g) {
-      g = {
-        ...s,
-        lat: Number(s.cityLat ?? s.lat),
-        lng: Number(s.cityLng ?? s.lng),
-        items: [],
-        count: 0,
-      };
-      groups.push(g);
-    }
-    g.items.push(s);
-    g.count++;
-  }
-  return groups;
-}
+import { cluster } from "./map-utils";
+export { cluster } from "./map-utils";
 export default function World({ stories = [], onPick, pick, compact = false }) {
   const mount = useRef(null),
     instance = useRef(null);
@@ -90,6 +65,7 @@ export default function World({ stories = [], onPick, pick, compact = false }) {
           .pointOfView({ lat: 25, lng: 108, altitude: 2.4 }, 0)
           .htmlElement((d) => {
             const b = document.createElement("button");
+            b.type = "button";
             b.className = "globe-marker";
             b.textContent = d.count > 1 ? String(d.count) : "•";
             b.title =
@@ -224,12 +200,14 @@ export default function World({ stories = [], onPick, pick, compact = false }) {
       <div className="world-toolbar">
         <div className="segmented">
           <button
+            type="button"
             className={!flat ? "selected" : ""}
             onClick={() => setFlat(false)}
           >
             <GlobeHemisphereEast /> 地球
           </button>
           <button
+            type="button"
             className={flat ? "selected" : ""}
             onClick={() => setFlat(true)}
           >
@@ -274,7 +252,10 @@ export default function World({ stories = [], onPick, pick, compact = false }) {
                 role="button"
                 aria-label={g.title}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter") select(g);
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    select(g);
+                  }
                 }}
               >
                 <circle r="5" />
@@ -300,6 +281,7 @@ export default function World({ stories = [], onPick, pick, compact = false }) {
           {loading && <div className="globe-loading">正在展开地球…</div>}
           <div className="globe-controls">
             <button
+              type="button"
               aria-label="放大"
               onClick={() => {
                 const g = instance.current;
@@ -316,6 +298,7 @@ export default function World({ stories = [], onPick, pick, compact = false }) {
               <Plus />
             </button>
             <button
+              type="button"
               aria-label="缩小"
               onClick={() => {
                 const g = instance.current;
@@ -341,6 +324,7 @@ export default function World({ stories = [], onPick, pick, compact = false }) {
       {selected && (
         <div className="story-detail">
           <button
+            type="button"
             className="close"
             aria-label="关闭故事"
             onClick={() => setSelected(null)}

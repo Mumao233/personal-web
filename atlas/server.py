@@ -82,6 +82,8 @@ class LocalServer(ThreadingHTTPServer):
 
 
 WEATHER_INIT_LOCK = threading.Lock()
+MAX_REFRESH_BODY_BYTES = 4096
+REFRESH_BODY_TIMEOUT_SECONDS = 5
 
 
 class Handler(SimpleHTTPRequestHandler):
@@ -119,8 +121,41 @@ class Handler(SimpleHTTPRequestHandler):
         if origin and origin not in expected:
             self.send_error(403, 'Weather updates require the local atlas origin')
             return
+        if not self._consume_refresh_body():
+            return
         service = self.server.ocean if self.path == '/__local/ocean/refresh' else self.server.currents if self.path == '/__local/currents/refresh' else self.server.weather
         self._json(service.refresh(force=True))
+
+    def _consume_refresh_body(self):
+        """Drain bounded input before reusing a gateway connection."""
+        lengths = self.headers.get_all('Content-Length', [])
+        if self.headers.get_all('Transfer-Encoding'):
+            self.send_error(400, 'Transfer-Encoding is not supported for refresh requests')
+            return False
+        if len(lengths) > 1 or (lengths and not re.fullmatch(r'[0-9]+', lengths[0])):
+            self.send_error(400, 'Invalid Content-Length')
+            return False
+        # Compare length before int(): excessively long integer headers also
+        # need a bounded error response, independent of Python's digit limit.
+        length = lengths[0].lstrip('0') if lengths else ''
+        if len(length) > 4 or (length and int(length) > MAX_REFRESH_BODY_BYTES):
+            self.send_error(413, 'Refresh request body is too large')
+            return False
+        count = int(length or '0')
+        if not count:
+            return True
+        previous_timeout = self.connection.gettimeout()
+        try:
+            self.connection.settimeout(REFRESH_BODY_TIMEOUT_SECONDS)
+            if len(self.rfile.read(count)) != count:
+                self.send_error(400, 'Incomplete refresh request body')
+                return False
+        except (TimeoutError, OSError):
+            self.send_error(408, 'Refresh request body timed out')
+            return False
+        finally:
+            self.connection.settimeout(previous_timeout)
+        return True
 
     def guess_type(self, path):
         suffix = Path(path).suffix.lower()

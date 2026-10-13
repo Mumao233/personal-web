@@ -12,8 +12,24 @@ export async function api(path, options = {}) {
           ? JSON.stringify(options.body)
           : undefined,
   });
-  const data = await r.json();
-  if (!r.ok) throw Error(data.error || "操作失败");
+  let data;
+  try {
+    data = await r.json();
+  } catch {
+    if (r.ok) {
+      const error = new Error("服务器返回格式异常，请稍后重试");
+      error.status = r.status;
+      error.code = "INVALID_RESPONSE";
+      throw error;
+    }
+    data = {};
+  }
+  if (!r.ok) {
+    const error = new Error(data?.error || "操作失败，请稍后重试");
+    error.status = r.status;
+    error.code = data?.code;
+    throw error;
+  }
   return data;
 }
 export const date = (v) =>

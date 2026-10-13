@@ -42,6 +42,7 @@ CHUNK_BYTES = 512 * 1024
 REFRESH_SECONDS = 3600
 MIN_REFRESH_SECONDS = 300
 CHUNK_NAME = re.compile(r'gfs-(?:surface|clouds)-[a-f0-9]{16}-\d{2,3}\.bin\Z')
+GRID_NAME = re.compile(r'gfs-(?:surface|clouds)-[a-f0-9]{64}\.bin\Z')
 
 
 def utc_iso(value=None):
@@ -309,7 +310,9 @@ class WeatherLive:
             if not isinstance(width, int) or not isinstance(height, int) or not 360 <= width <= 2880 or not 181 <= height <= 1441:
                 raise WeatherDataError('Invalid cached weather dimensions')
             iso_seconds(metadata['validTime'])
+            grids = []
             for key in ('binaryParts', 'cloudBinaryParts'):
+                blocks = []
                 expected_bytes = width * height * (12 if key == 'binaryParts' else 4)
                 if sum(part['bytes'] for part in metadata[key]) != expected_bytes:
                     raise WeatherDataError('Invalid cached weather byte count')
@@ -320,6 +323,11 @@ class WeatherLive:
                     content = path.read_bytes()
                     if len(content) != part['bytes'] or hashlib.sha256(content).hexdigest() != part['sha256']:
                         raise WeatherDataError('Cached weather checksum mismatch')
+                    blocks.append(content)
+                grids.append(b''.join(blocks))
+            # Older manifests used mutable full-grid aliases. Reconstruct from
+            # the verified chunks, including after an interrupted old commit.
+            self._write_full_grids(metadata, *grids)
             self.cached = metadata
             self.last_success = metadata['downloadedAt']
             iso_seconds(self.last_success)
@@ -430,6 +438,7 @@ class WeatherLive:
         return content
 
     def _commit(self, metadata, surface, clouds):
+        metadata = dict(metadata)
         for label, content, key in (('surface', surface, 'binaryParts'), ('clouds', clouds, 'cloudBinaryParts')):
             parts = []
             for number, start in enumerate(range(0, len(content), CHUNK_BYTES)):
@@ -441,12 +450,9 @@ class WeatherLive:
                     self._atomic_write(path, block)
                 parts.append({'url': '/__local/weather/chunks/' + name, 'bytes': len(block), 'sha256': digest})
             metadata[key] = parts
-        # Ny uses the verified parts whenever they exist. These full-grid paths
-        # retain compatibility with readers that do not understand chunk lists.
-        self._atomic_write(self.cache / 'gfs-surface.bin', surface)
-        self._atomic_write(self.cache / 'gfs-clouds.bin', clouds)
-        metadata['binary'] = '/__local/weather/gfs-surface.bin'
-        metadata['cloudBinary'] = '/__local/weather/gfs-clouds.bin'
+        # Both representations are immutable. Only the final manifest replace
+        # publishes a generation; failed writes cannot change current aliases.
+        self._write_full_grids(metadata, surface, clouds)
         if self.cached:
             self._atomic_write(self.cache / 'previous-manifest.json', json.dumps(self.cached, ensure_ascii=False, indent=2).encode('utf-8'))
         self._atomic_write(self.cache / 'manifest.json', json.dumps(metadata, ensure_ascii=False, indent=2).encode('utf-8'))
@@ -456,14 +462,26 @@ class WeatherLive:
             self.error = None
         self._prune_chunks(metadata)
 
+    def _write_full_grids(self, metadata, surface, clouds):
+        for label, content, key in (('surface', surface, 'binary'), ('clouds', clouds, 'cloudBinary')):
+            digest = hashlib.sha256(content).hexdigest()
+            name = f'gfs-{label}-{digest}.bin'
+            path = self.cache / 'grids' / name
+            # Repair a damaged derived grid from the verified source chunks.
+            if not path.is_file() or hashlib.sha256(path.read_bytes()).hexdigest() != digest:
+                self._atomic_write(path, content)
+            metadata[key] = '/__local/weather/grids/' + name
+
     def _prune_chunks(self, current):
         """Keep current/previous grids and allow two hours for in-flight clients."""
         keep = {part['url'].rsplit('/', 1)[-1]
                 for key in ('binaryParts', 'cloudBinaryParts') for part in current[key]}
+        grids = {current[key].rsplit('/', 1)[-1] for key in ('binary', 'cloudBinary')}
         try:
             previous = json.loads((self.cache / 'previous-manifest.json').read_text(encoding='utf-8'))
             keep.update(part['url'].rsplit('/', 1)[-1]
                         for key in ('binaryParts', 'cloudBinaryParts') for part in previous[key])
+            grids.update(previous[key].rsplit('/', 1)[-1] for key in ('binary', 'cloudBinary'))
         except (OSError, ValueError, KeyError, TypeError):
             pass
         for path in (self.cache / 'chunks').glob('*.bin'):
@@ -473,12 +491,27 @@ class WeatherLive:
                     path.unlink()
             except (OSError, ValueError):
                 pass
+        for path in (self.cache / 'grids').glob('*.bin'):
+            try:
+                path.resolve().relative_to(self.cache.resolve())
+                if GRID_NAME.fullmatch(path.name) and path.name not in grids and time.time() - path.stat().st_mtime > 7200:
+                    path.unlink()
+            except (OSError, ValueError):
+                pass
 
     def full_grid_path(self, name):
-        if name not in ('gfs-surface.bin', 'gfs-clouds.bin'):
-            return None
-        path = self.cache / name
-        return path if path.is_file() and self.cached else None
+        with self.lock:
+            if not self.cached or not isinstance(name, str):
+                return None
+            # Keep the old URLs usable, but resolve them through the committed
+            # manifest rather than reading a separately overwritten file.
+            if name in ('gfs-surface.bin', 'gfs-clouds.bin'):
+                key = 'binary' if name == 'gfs-surface.bin' else 'cloudBinary'
+                name = self.cached[key].removeprefix('/__local/weather/')
+            if not name.startswith('grids/') or not GRID_NAME.fullmatch(name[6:]):
+                return None
+            path = self.cache / name
+            return path if path.is_file() else None
 
     def _run_refresh(self):
         try:

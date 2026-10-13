@@ -8,6 +8,7 @@ const validId = (value) =>
   value.length > 0 &&
   value.length <= 120 &&
   !["__proto__", "constructor", "prototype"].includes(value) &&
+  !Object.prototype.hasOwnProperty.call(Object.prototype, value) &&
   !value.endsWith("__other");
 const optionsFor = (question) => [
   ...new Set([
@@ -30,7 +31,8 @@ export function exclusiveOptionsFor(question) {
 }
 
 function questionAnswer(question, answers) {
-  const value = answers?.[question.id];
+  const value =
+    answers && own(answers, question.id) ? answers[question.id] : undefined;
   const missing =
     value == null || value === "" || (Array.isArray(value) && !value.length);
   if (question.type === "matrix") {
@@ -84,7 +86,9 @@ function questionAnswer(question, answers) {
     throw Error(`互斥选项不能与其他选项同时选择：${question.title}`);
   let other;
   if (question.allowOther && values.includes("其他")) {
-    other = answers[question.id + "__other"];
+    other = own(answers, question.id + "__other")
+      ? answers[question.id + "__other"]
+      : undefined;
     if (typeof other !== "string" || !other.trim() || other.length > 10000)
       throw Error(`请补充“其他”的内容：${question.title}`);
     other = other.trim();
@@ -123,7 +127,10 @@ export function surveyFlow(survey, answers = {}) {
   let termination = null;
   for (const question of survey.questions || []) {
     const condition = question.condition;
-    const conditionAnswer = answers?.[condition?.questionId];
+    const conditionAnswer =
+      condition?.questionId && own(answers, condition.questionId)
+        ? answers[condition.questionId]
+        : undefined;
     const visible =
       !condition?.questionId ||
       (shown.has(condition.questionId) &&
@@ -134,9 +141,10 @@ export function surveyFlow(survey, answers = {}) {
     if (!visible) continue;
     shown.add(question.id);
     questions.push(question);
-    const selected = Array.isArray(answers?.[question.id])
-      ? answers[question.id]
-      : [answers?.[question.id]];
+    const selected =
+      own(answers, question.id) && Array.isArray(answers?.[question.id])
+        ? answers[question.id]
+        : [own(answers, question.id) ? answers[question.id] : undefined];
     const endChoice = (question.terminateOptions || []).find((option) =>
       selected.includes(option),
     );
@@ -229,6 +237,8 @@ export function validateSurvey(survey) {
       }
       if (question.allowOther) throw Error("矩阵题不支持“其他”选项");
     }
+    if (["text", "rank"].includes(question.type) && question.allowOther)
+      throw Error("文字与全排序题不支持“其他”选项");
     for (const [name, supported] of [
       ["terminateOptions", ruleTypes],
       ["exclusiveOptions", ["multiple", "multirank"]],
@@ -272,6 +282,28 @@ export function validateSurvey(survey) {
       (min && min > optionsFor(question).length)
     )
       throw Error("选择数量范围无效");
+    if (question.type === "single" && (min > 1 || max > 1))
+      throw Error("单选题只能选择一个选项");
+    if (["text", "matrix"].includes(question.type) && (min || max))
+      throw Error("文字和矩阵题不能设置选项数量限制");
+    if (
+      question.type === "rank" &&
+      ((min && min !== question.options.length) ||
+        (max && max !== question.options.length))
+    )
+      throw Error("全排序题必须对全部选项排序，不能限制为部分选项");
+    if (["multiple", "multirank"].includes(question.type)) {
+      const options = optionsFor(question);
+      const exclusives = exclusiveOptionsFor(question);
+      const canSingle =
+        (!max || max >= 1) &&
+        (exclusives.length || (question.terminateOptions || []).length);
+      if (
+        min > options.filter((option) => !exclusives.includes(option)).length &&
+        !canSingle
+      )
+        throw Error("选择数量限制无法满足，请调整互斥选项或最少数量");
+    }
     previous.set(question.id, question);
   }
   if (

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "./api";
+import { isRevisionConflict } from "./editor-state";
 
 // Requests are serialized so an older autosave can never replace newer writing.
 export default function useDraftPublishing(kind, item, value, blocked) {
@@ -12,10 +13,13 @@ export default function useDraftPublishing(kind, item, value, blocked) {
   const saved = useRef(fingerprint);
   const record = useRef(item);
   const queue = useRef(Promise.resolve());
+  const conflictRef = useRef(false);
+  const discarded = useRef(false);
   const [meta, setMeta] = useState(item);
   const [saving, setSaving] = useState(false);
   const [action, setAction] = useState("");
   const [error, setError] = useState("");
+  const [conflict, setConflict] = useState(false);
   const [message, setMessage] = useState("");
   const dirty = fingerprint !== saved.current;
 
@@ -25,6 +29,8 @@ export default function useDraftPublishing(kind, item, value, blocked) {
     return next;
   }
   async function persist(force = false) {
+    if (discarded.current) return;
+    if (conflictRef.current) throw new Error("请先处理版本冲突，再保存修改。");
     setSaving(true);
     setError("");
     try {
@@ -44,6 +50,10 @@ export default function useDraftPublishing(kind, item, value, blocked) {
       }
       setMessage("草稿已保存");
     } catch (e) {
+      if (isRevisionConflict(e)) {
+        conflictRef.current = true;
+        setConflict(true);
+      }
       setError(e.message);
       throw e;
     } finally {
@@ -52,7 +62,7 @@ export default function useDraftPublishing(kind, item, value, blocked) {
   }
   const save = (force = false) => serialize(() => persist(force));
   async function transition(operation) {
-    if (blocked) return false;
+    if (blocked || conflictRef.current || discarded.current) return false;
     setAction(operation);
     setMessage("");
     try {
@@ -77,6 +87,10 @@ export default function useDraftPublishing(kind, item, value, blocked) {
       );
       return true;
     } catch (e) {
+      if (isRevisionConflict(e)) {
+        conflictRef.current = true;
+        setConflict(true);
+      }
       setError(e.message);
       return false;
     } finally {
@@ -84,6 +98,7 @@ export default function useDraftPublishing(kind, item, value, blocked) {
     }
   }
   async function leave() {
+    if (conflictRef.current) return false;
     if (blocked || action) {
       setError(
         blocked
@@ -100,12 +115,20 @@ export default function useDraftPublishing(kind, item, value, blocked) {
     }
   }
   useEffect(() => {
-    if (!enabled || !dirty || blocked || action) return;
+    if (
+      !enabled ||
+      !dirty ||
+      blocked ||
+      action ||
+      conflict ||
+      discarded.current
+    )
+      return;
     const timer = setTimeout(() => {
       save().catch(() => {});
     }, 1200);
     return () => clearTimeout(timer);
-  }, [fingerprint, enabled, blocked, action]);
+  }, [fingerprint, enabled, blocked, action, conflict]);
   useEffect(() => {
     if (!enabled) return;
     const warn = (event) => {
@@ -127,9 +150,25 @@ export default function useDraftPublishing(kind, item, value, blocked) {
     saving,
     action,
     error,
+    conflict,
     message,
     save,
     leave,
+    discard: () => {
+      discarded.current = true;
+      saved.current = JSON.stringify(latest.current);
+    },
+    reset: (next, snapshot) => {
+      record.current = next;
+      latest.current = snapshot;
+      saved.current = JSON.stringify(snapshot);
+      discarded.current = false;
+      conflictRef.current = false;
+      setConflict(false);
+      setError("");
+      setMessage("已载入最新版本");
+      setMeta(next);
+    },
     publish: () => transition("publish"),
     unpublish: () => transition("unpublish"),
   };

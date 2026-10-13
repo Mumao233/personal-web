@@ -15,6 +15,9 @@ import {
   UploadSimple,
 } from "@phosphor-icons/react";
 import { api, date } from "./api";
+import { isRevisionConflict, localDate, latestRequest } from "./editor-state";
+import { ConflictRecovery, useLeaveGuard } from "./editor-recovery";
+import ModuleBoundary from "./module-boundary";
 import Survey from "./survey";
 import RichEditor from "./rich-editor";
 import ArticleContent from "./article-content";
@@ -47,6 +50,7 @@ function localTime(v) {
 }
 const newContent = (kind) => ({
   id: "new",
+  revision: 0,
   title: "",
   body: "",
   published: false,
@@ -55,7 +59,7 @@ const newContent = (kind) => ({
   category: "",
   status: "",
   excerpt: "",
-  date: new Date().toISOString().slice(0, 10),
+  date: localDate(),
   location: "",
   city: "",
   lat: 23.1291,
@@ -319,7 +323,13 @@ export default function Admin() {
           className="quiet"
           onClick={async () => {
             if (leaveEditor.current && !(await leaveEditor.current())) return;
-            await attempt(() => api("/logout", { method: "POST" }), "已退出");
+            if (
+              await attempt(() => api("/logout", { method: "POST" }), "已退出")
+            ) {
+              setEditor(null);
+              setTab("profile");
+              setLogin({ username: "", password: "" });
+            }
           }}
         >
           <SignOut /> 退出
@@ -356,9 +366,16 @@ export default function Admin() {
           <Profile
             data={state.profile}
             busy={busy}
-            save={(b) =>
-              attempt(() => api("/admin/profile", { method: "PUT", body: b }))
-            }
+            leaveEditor={leaveEditor}
+            save={async (b) => {
+              const result = await api("/admin/profile", {
+                method: "PUT",
+                body: b,
+              });
+              await load();
+              setNotice("资料已保存");
+              return result.profile;
+            }}
           />
         )}
         {["projects", "posts", "stories", "surveys"].includes(tab) &&
@@ -374,15 +391,13 @@ export default function Admin() {
                 load();
               }}
               save={async (b) => {
-                if (
-                  await attempt(() =>
-                    api("/admin/" + tab + "/" + b.id, {
-                      method: "PUT",
-                      body: b,
-                    }),
-                  )
-                )
-                  setEditor(null);
+                const result = await api("/admin/" + tab + "/" + b.id, {
+                  method: "PUT",
+                  body: b,
+                });
+                await load();
+                setNotice("问卷已保存");
+                return result;
               }}
             />
           ) : (
@@ -448,11 +463,61 @@ export default function Admin() {
     </div>
   );
 }
-function Profile({ data, save, busy }) {
-  const [b, setB] = useState(data),
+export function Profile({ data, save, busy, leaveEditor }) {
+  const [b, setB] = useState(() => ({ revision: 0, ...data })),
     [uploading, setUploading] = useState(false),
-    [err, setErr] = useState("");
-  const set = (k, v) => setB({ ...b, [k]: v });
+    [err, setErr] = useState(""),
+    [saving, setSaving] = useState(false),
+    [conflict, setConflict] = useState(false);
+  const initial = useRef(JSON.stringify({ revision: 0, ...data }));
+  const saveLock = useRef(false);
+  const set = (k, v) => setB((previous) => ({ ...previous, [k]: v }));
+  async function submit() {
+    if (saveLock.current || uploading || conflict) return false;
+    saveLock.current = true;
+    setSaving(true);
+    setErr("");
+    try {
+      const result = await save(b);
+      initial.current = JSON.stringify(result);
+      setB(result);
+      return true;
+    } catch (error) {
+      setErr(error.message);
+      setConflict(isRevisionConflict(error));
+      return false;
+    } finally {
+      saveLock.current = false;
+      setSaving(false);
+    }
+  }
+  const guard = useLeaveGuard({
+    dirty: JSON.stringify(b) !== initial.current,
+    blocked: saving || uploading,
+    onSave: submit,
+  });
+  useEffect(() => {
+    if (!leaveEditor) return;
+    leaveEditor.current = guard.request;
+    return () => {
+      leaveEditor.current = null;
+    };
+  });
+  async function reload() {
+    setSaving(true);
+    try {
+      const result = await api("/admin");
+      const profile = { revision: 0, ...result.profile };
+      initial.current = JSON.stringify(profile);
+      setB(profile);
+      setConflict(false);
+      setErr("");
+    } catch (error) {
+      setErr(error.message);
+    } finally {
+      setSaving(false);
+    }
+  }
   async function portrait(e) {
     setUploading(true);
     try {
@@ -471,156 +536,167 @@ function Profile({ data, save, busy }) {
       className="editor-form"
       onSubmit={(e) => {
         e.preventDefault();
-        save(b);
+        submit();
       }}
     >
-      <ProfileFieldsEditor profile={b} onChange={setB} />
-      <Field
-        label="首页短介绍"
-        type="textarea"
-        value={b.intro}
-        onChange={(v) => set("intro", v)}
-        rows={3}
-      />
-      <Field
-        label="个人自述"
-        type="textarea"
-        value={b.bio}
-        onChange={(v) => set("bio", v)}
-        rows={12}
-      />
-      <label>
-        个人照片
-        <input
-          type="file"
-          accept="image/jpeg,image/png,image/webp"
-          disabled={uploading}
-          onChange={portrait}
-        />
-      </label>
-      {b.portrait && (
-        <div className="uploaded-preview">
-          <img src={b.portrait} alt="个人照片" />
-          <button type="button" onClick={() => set("portrait", "")}>
-            移除
-          </button>
-        </div>
+      {guard.dialog}
+      {conflict && (
+        <ConflictRecovery value={b} busy={saving} onReload={reload} />
       )}
-      {err && <p className="error">{err}</p>}
-      <h2>最近在关注</h2>
-      {b.interests.map((x, i) => (
-        <div className="repeater" key={i}>
-          <Field
-            label="标题"
-            value={x.title}
-            onChange={(v) =>
-              set(
-                "interests",
-                b.interests.map((y, j) => (j === i ? { ...y, title: v } : y)),
-              )
-            }
+      <fieldset className="editor-fields" disabled={saving || busy}>
+        <ProfileFieldsEditor profile={b} onChange={setB} />
+        <Field
+          label="首页短介绍"
+          type="textarea"
+          value={b.intro}
+          onChange={(v) => set("intro", v)}
+          rows={3}
+        />
+        <Field
+          label="个人自述"
+          type="textarea"
+          value={b.bio}
+          onChange={(v) => set("bio", v)}
+          rows={12}
+        />
+        <label>
+          个人照片
+          <input
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            disabled={uploading}
+            onChange={portrait}
           />
-          <Field
-            label="描述"
-            value={x.text}
-            onChange={(v) =>
-              set(
-                "interests",
-                b.interests.map((y, j) => (j === i ? { ...y, text: v } : y)),
-              )
-            }
-          />
-          <Field
-            label="状态"
-            value={x.status}
-            onChange={(v) =>
-              set(
-                "interests",
-                b.interests.map((y, j) => (j === i ? { ...y, status: v } : y)),
-              )
-            }
-          />
-          <button
-            type="button"
-            className="danger"
-            onClick={() =>
-              set(
-                "interests",
-                b.interests.filter((_, j) => j !== i),
-              )
-            }
-          >
-            移除
-          </button>
-        </div>
-      ))}
-      <button
-        type="button"
-        className="quiet"
-        onClick={() =>
-          set("interests", [
-            ...b.interests,
-            { title: "", text: "", status: "" },
-          ])
-        }
-      >
-        <Plus /> 添加关注
-      </button>
-      <h2>经历时间线</h2>
-      {b.timeline.map((x, i) => (
-        <div className="repeater" key={i}>
-          {[
-            ["date", "时间"],
-            ["title", "名称"],
-            ["text", "说明"],
-          ].map(([k, l]) => (
+        </label>
+        {b.portrait && (
+          <div className="uploaded-preview">
+            <img src={b.portrait} alt="个人照片" />
+            <button type="button" onClick={() => set("portrait", "")}>
+              移除
+            </button>
+          </div>
+        )}
+        {err && <p className="error">{err}</p>}
+        <h2>最近在关注</h2>
+        {b.interests.map((x, i) => (
+          <div className="repeater" key={i}>
             <Field
-              key={k}
-              label={l}
-              value={x[k]}
+              label="标题"
+              value={x.title}
               onChange={(v) =>
                 set(
-                  "timeline",
-                  b.timeline.map((y, j) => (j === i ? { ...y, [k]: v } : y)),
+                  "interests",
+                  b.interests.map((y, j) => (j === i ? { ...y, title: v } : y)),
                 )
               }
             />
-          ))}
-          <button
-            type="button"
-            className="danger"
-            onClick={() =>
-              set(
-                "timeline",
-                b.timeline.filter((_, j) => j !== i),
-              )
-            }
-          >
-            移除
-          </button>
-        </div>
-      ))}
-      <button
-        type="button"
-        className="quiet"
-        onClick={() =>
-          set("timeline", [...b.timeline, { date: "", title: "", text: "" }])
-        }
-      >
-        <Plus /> 添加经历
-      </button>
-      <Toggle
-        label="接受新的提问"
-        value={b.acceptQuestions}
-        onChange={(v) => set("acceptQuestions", v)}
-      />
-      <button className="button" disabled={busy || uploading}>
-        <FloppyDisk /> 保存资料
-      </button>
+            <Field
+              label="描述"
+              value={x.text}
+              onChange={(v) =>
+                set(
+                  "interests",
+                  b.interests.map((y, j) => (j === i ? { ...y, text: v } : y)),
+                )
+              }
+            />
+            <Field
+              label="状态"
+              value={x.status}
+              onChange={(v) =>
+                set(
+                  "interests",
+                  b.interests.map((y, j) =>
+                    j === i ? { ...y, status: v } : y,
+                  ),
+                )
+              }
+            />
+            <button
+              type="button"
+              className="danger"
+              onClick={() =>
+                set(
+                  "interests",
+                  b.interests.filter((_, j) => j !== i),
+                )
+              }
+            >
+              移除
+            </button>
+          </div>
+        ))}
+        <button
+          type="button"
+          className="quiet"
+          onClick={() =>
+            set("interests", [
+              ...b.interests,
+              { title: "", text: "", status: "" },
+            ])
+          }
+        >
+          <Plus /> 添加关注
+        </button>
+        <h2>经历时间线</h2>
+        {b.timeline.map((x, i) => (
+          <div className="repeater" key={i}>
+            {[
+              ["date", "时间"],
+              ["title", "名称"],
+              ["text", "说明"],
+            ].map(([k, l]) => (
+              <Field
+                key={k}
+                label={l}
+                value={x[k]}
+                onChange={(v) =>
+                  set(
+                    "timeline",
+                    b.timeline.map((y, j) => (j === i ? { ...y, [k]: v } : y)),
+                  )
+                }
+              />
+            ))}
+            <button
+              type="button"
+              className="danger"
+              onClick={() =>
+                set(
+                  "timeline",
+                  b.timeline.filter((_, j) => j !== i),
+                )
+              }
+            >
+              移除
+            </button>
+          </div>
+        ))}
+        <button
+          type="button"
+          className="quiet"
+          onClick={() =>
+            set("timeline", [...b.timeline, { date: "", title: "", text: "" }])
+          }
+        >
+          <Plus /> 添加经历
+        </button>
+        <Toggle
+          label="接受新的提问"
+          value={b.acceptQuestions}
+          onChange={(v) => set("acceptQuestions", v)}
+        />
+        <button
+          className="button"
+          disabled={busy || saving || uploading || conflict}
+        >
+          <FloppyDisk /> {saving ? "正在保存…" : "保存资料"}
+        </button>
+      </fieldset>
     </form>
   );
 }
-function ContentEditor({ kind, item, save, close, busy, leaveEditor }) {
+export function ContentEditor({ kind, item, save, close, busy, leaveEditor }) {
   const [b, setB] = useState(() => ({
       ...newContent(kind),
       ...(item.id !== "new" ? { date: "" } : {}),
@@ -641,15 +717,79 @@ function ContentEditor({ kind, item, save, close, busy, leaveEditor }) {
     b,
     uploading || inlineUploading,
   );
+  const [surveySaving, setSurveySaving] = useState(false);
+  const [surveyConflict, setSurveyConflict] = useState(false);
+  const [reloading, setReloading] = useState(false);
+  const [editorEpoch, setEditorEpoch] = useState(0);
+  const surveySaved = useRef(JSON.stringify(b));
+  const saveLock = useRef(false);
+  const searches = useRef(latestRequest());
+  const activeQuery = useRef(query);
+  activeQuery.current = query;
+  useEffect(() => () => searches.current.invalidate(), []);
+  async function saveSurvey() {
+    if (saveLock.current || surveyConflict) return false;
+    saveLock.current = true;
+    setSurveySaving(true);
+    setError("");
+    try {
+      const result = await save({
+        ...b,
+        revision: b.revision || 0,
+        startsAt: b.startsAt ? new Date(b.startsAt).toISOString() : "",
+        endsAt: b.endsAt ? new Date(b.endsAt).toISOString() : "",
+      });
+      surveySaved.current = JSON.stringify(result);
+      setB(result);
+      return true;
+    } catch (error) {
+      setError(error.message);
+      setSurveyConflict(isRevisionConflict(error));
+      return false;
+    } finally {
+      saveLock.current = false;
+      setSurveySaving(false);
+    }
+  }
+  const guard = useLeaveGuard({
+    dirty: kind === "surveys" && JSON.stringify(b) !== surveySaved.current,
+    blocked: kind === "surveys" && surveySaving,
+    onSave: saveSurvey,
+  });
+  const leave = kind === "surveys" ? guard.request : publisher.leave;
   useEffect(() => {
-    if (kind === "surveys") return;
-    leaveEditor.current = publisher.leave;
+    leaveEditor.current = leave;
     return () => {
       leaveEditor.current = null;
     };
   });
   async function goBack() {
-    if (kind === "surveys" || (await publisher.leave())) close();
+    if (await leave()) close();
+  }
+  async function reload() {
+    setReloading(true);
+    setError("");
+    try {
+      const record = await api(
+        `/admin/${kind}/${kind === "surveys" ? b.id : publisher.meta.id}`,
+      );
+      const snapshot = {
+        ...newContent(kind),
+        date: "",
+        ...record,
+        ...record.draft,
+      };
+      if (kind === "surveys") {
+        surveySaved.current = JSON.stringify(snapshot);
+        setSurveyConflict(false);
+      } else publisher.reset(record, snapshot);
+      setB(snapshot);
+      setEditorEpoch((epoch) => epoch + 1);
+    } catch (error) {
+      setError(error.message);
+    } finally {
+      setReloading(false);
+    }
   }
   const set = (k, v) =>
     setB((prev) => ({
@@ -803,10 +943,23 @@ function ContentEditor({ kind, item, save, close, busy, leaveEditor }) {
   }
   async function search(e) {
     e.preventDefault();
+    const request = searches.current.next();
+    const requestedQuery = query;
     try {
-      setPlaces(await api("/geocode?q=" + encodeURIComponent(query)));
+      const result = await api(
+        "/geocode?q=" + encodeURIComponent(requestedQuery),
+      );
+      if (
+        searches.current.isCurrent(request) &&
+        activeQuery.current === requestedQuery
+      )
+        setPlaces(result);
     } catch (e) {
-      setError(e.message);
+      if (
+        searches.current.isCurrent(request) &&
+        activeQuery.current === requestedQuery
+      )
+        setError(e.message);
     }
   }
   function pick(c) {
@@ -827,26 +980,34 @@ function ContentEditor({ kind, item, save, close, busy, leaveEditor }) {
             publisher.publish();
             return;
           }
-          if (kind === "stories" && b.published && !b.confirmLocation) {
-            setError("请确认照片的精确位置后再发布");
-            return;
-          }
-          save(
-            kind === "surveys"
-              ? {
-                  ...b,
-                  startsAt: b.startsAt
-                    ? new Date(b.startsAt).toISOString()
-                    : "",
-                  endsAt: b.endsAt ? new Date(b.endsAt).toISOString() : "",
-                }
-              : b,
-          );
+          saveSurvey().then((saved) => {
+            if (saved) close();
+          });
         }}
       >
-        <div
+        {guard.dialog}
+        {(surveyConflict || publisher.conflict) && (
+          <ConflictRecovery
+            value={b}
+            busy={
+              reloading ||
+              surveySaving ||
+              publisher.saving ||
+              !!publisher.action
+            }
+            onReload={reload}
+            onDiscard={() => {
+              publisher.discard();
+              close();
+            }}
+          />
+        )}
+        <fieldset
           className="editor-fields"
-          inert={publisher.action ? true : undefined}
+          disabled={surveySaving || reloading || !!publisher.action}
+          inert={
+            publisher.action || reloading || surveySaving ? true : undefined
+          }
         >
           <Field
             label="标题"
@@ -1296,6 +1457,7 @@ function ContentEditor({ kind, item, save, close, busy, leaveEditor }) {
           ) : (
             <>
               <RichEditor
+                key={editorEpoch}
                 content={b.content}
                 body={b.body}
                 photos={kind === "stories" ? b.photos : []}
@@ -1395,7 +1557,11 @@ function ContentEditor({ kind, item, save, close, busy, leaveEditor }) {
                     <Field
                       label="搜索地址或景点"
                       value={query}
-                      onChange={setQuery}
+                      onChange={(value) => {
+                        searches.current.invalidate();
+                        setQuery(value);
+                        setPlaces([]);
+                      }}
                     />
                     <button type="button" onClick={search}>
                       搜索地点
@@ -1466,13 +1632,15 @@ function ContentEditor({ kind, item, save, close, busy, leaveEditor }) {
                       已读取或选择坐标，请确认地点名称和位置。
                     </p>
                   )}
-                  <Suspense fallback={<p>正在打开地图…</p>}>
-                    <World
-                      compact
-                      pick={{ lat: b.lat, lng: b.lng }}
-                      onPick={pick}
-                    />
-                  </Suspense>
+                  <ModuleBoundary label="地点地图">
+                    <Suspense fallback={<p>正在打开地图…</p>}>
+                      <World
+                        compact
+                        pick={{ lat: b.lat, lng: b.lng }}
+                        onPick={pick}
+                      />
+                    </Suspense>
+                  </ModuleBoundary>
                   <Toggle
                     label="我已确认这个精确位置可以公开"
                     value={b.confirmLocation}
@@ -1482,8 +1650,12 @@ function ContentEditor({ kind, item, save, close, busy, leaveEditor }) {
               )}
             </>
           )}
-        </div>
-        {error && <p className="error">{error}</p>}
+        </fieldset>
+        {error && (
+          <p className="error" role="alert">
+            {error}
+          </p>
+        )}
         {kind !== "surveys" && publisher.error && (
           <p className="error" role="alert">
             {publisher.error}
@@ -1518,7 +1690,8 @@ function ContentEditor({ kind, item, save, close, busy, leaveEditor }) {
                   !!publisher.action ||
                   uploading ||
                   inlineUploading ||
-                  publisher.saving
+                  publisher.saving ||
+                  publisher.conflict
                 }
                 onClick={() => publisher.save(true).catch(() => {})}
               >
@@ -1536,7 +1709,12 @@ function ContentEditor({ kind, item, save, close, busy, leaveEditor }) {
               {publisher.meta.published && (
                 <button
                   type="button"
-                  disabled={!!publisher.action || uploading || inlineUploading}
+                  disabled={
+                    !!publisher.action ||
+                    uploading ||
+                    inlineUploading ||
+                    publisher.conflict
+                  }
                   onClick={publisher.unpublish}
                 >
                   撤下文章
@@ -1544,7 +1722,12 @@ function ContentEditor({ kind, item, save, close, busy, leaveEditor }) {
               )}
               <button
                 className="button"
-                disabled={!!publisher.action || uploading || inlineUploading}
+                disabled={
+                  !!publisher.action ||
+                  uploading ||
+                  inlineUploading ||
+                  publisher.conflict
+                }
               >
                 {publisher.action
                   ? "正在处理…"
@@ -1594,17 +1777,23 @@ function ContentEditor({ kind, item, save, close, busy, leaveEditor }) {
           </section>
         )}
         {kind === "surveys" && (
-          <div className="editor-save">
+          <fieldset
+            className="editor-fields editor-save"
+            disabled={surveySaving || reloading}
+          >
             <Toggle
               label="发布到网站（取消则保存为草稿）"
               value={b.published}
               onChange={(v) => set("published", v)}
             />
-            <button className="button" disabled={busy || uploading}>
+            <button
+              className="button"
+              disabled={busy || uploading || surveySaving || surveyConflict}
+            >
               <FloppyDisk />
-              {busy ? "正在保存…" : "保存"}
+              {surveySaving ? "正在保存…" : "保存"}
             </button>
-          </div>
+          </fieldset>
         )}
       </form>
       {kind === "surveys" && preview && (
@@ -2114,7 +2303,7 @@ function Results({ survey, close }) {
     </section>
   );
 }
-function Notifications({ state, attempt, busy }) {
+export function Notifications({ state, attempt, busy }) {
   const [n, setN] = useState(state.notifications),
     [mapping, setMapping] = useState(
       JSON.stringify(
@@ -2134,6 +2323,8 @@ function Notifications({ state, attempt, busy }) {
     unconfigured: "尚未配置",
     failed: "发送失败",
     sent: "已发送",
+    sending: "正在发送",
+    cancelled: "已取消",
   };
   return (
     <>
@@ -2238,13 +2429,13 @@ function Notifications({ state, attempt, busy }) {
           state.outbox.map((j) => (
             <div className="outbox-row" key={j.id}>
               <div>
-                <strong>{j.contact.value}</strong>
+                <strong>{j.contact?.value || "联系方式已清除"}</strong>
                 <p>
                   {status[j.status]} · {date(j.createdAt)}
                 </p>
                 {j.error && <small>{j.error}</small>}
               </div>
-              {j.status !== "sent" && (
+              {["pending", "failed", "unconfigured"].includes(j.status) && (
                 <button
                   onClick={() =>
                     attempt(

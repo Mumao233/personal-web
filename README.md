@@ -9,9 +9,12 @@
 
 ```powershell
 npm ci
+node server/init-admin.js
 npm run build
 npm start
 ```
+
+`init-admin.js` 只用于新数据库首次创建管理员，按提示在本机输入用户名和密码；已有管理员时会拒绝覆盖，可以跳过。生产模式（`npm start`）关闭所有 HTTP 初始化入口。不要将密码写进命令参数或提交到仓库。
 
 开发：`npm run dev`。使用 `PORT` 修改端口，`PYTHON` 指定 Python 路径。
 Node 自动启动仅监听本机随机端口的 Atlas Python 子服务，无需另外运行太阳系原来的启动脚本。
@@ -40,6 +43,10 @@ Node 自动启动仅监听本机随机端口的 Atlas Python 子服务，无需�
 
 问卷支持矩阵量表、选项触发提前结束、排他选择、分布统计与 Excel／CSV 导出；个人资料支持自定义栏目、链接和排序。操作方法见 [问卷与资料栏目](docs/survey-and-profile.md)。
 
+资料、问卷和文章的过期编辑会触发版本冲突，不会直接覆盖其他窗口的新内容；编辑器提供保留本地修改与重新载入入口。问卷提交绑定实际展示的题目版本，网络重试不会重复保存同一次提交。
+
+上传图片会清除 EXIF／IPTC／XMP 元数据，并处理方向与色彩。草稿、撤下和未被公开内容引用的媒体需要管理员登录；已公开内容仍引用的共享文件继续可访问。旧照片经服务器清洗副本提供，私有数据目录中的原文件不会被此升级删除。
+
 [可后续补充的素材](docs/materials-needed.md)：个人照片、旅行照片与地点、作品说明与截图、指定公开的联系方式。
 
 ## 验证
@@ -53,13 +60,15 @@ npm run build
 
 摘要见 [整合验证记录](docs/integration-verification.md)。
 
+v1.0.1 发布前验证：Node 99 项、Python 60 项、彗星轨道 20 项通过，生产构建通过。真实浏览器检查了资料并发冲突恢复和问卷未保存离开提示；生产部署状态另见部署记录。
+
 ## 仓库与部署
 
 源码仓库：https://github.com/Mumao233/personal-web
 
 线上网站：https://mumao.site/ · [阿里云部署记录](deploy/README.md)
 
-当前版本：**v1.0.0**。版本变化见 [更新日志](CHANGELOG.md)，发布约定见 [版本发布流程](docs/releases.md)。
+当前版本：**v1.0.1**。版本变化见 [更新日志](CHANGELOG.md)，本次审查整改见 [报告逐项对照](docs/v1.0.1-review-fixes.md)，发布约定见 [版本发布流程](docs/releases.md)。
 
 此仓库保存整合网站的完整源码。克隆后按“启动”一节安装依赖并运行；本地私有数据库、上传文件、运行缓存和构建产物不包含在仓库中。
 完整站包含 Node/SQLite 与 Python 服务，不能仅把静态 HTML 上传 GitHub Pages。正式上线需支持这两个服务的主机、HTTPS 及持久数据目录。

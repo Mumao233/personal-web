@@ -450,6 +450,7 @@ test("null documents are rejected without altering saved content and an empty do
 test("legacy plain text and media survive editing, and deleted drafts cannot be revived by a stale request", async () => {
   const legacy = await call("/admin/stories/new", "PUT", {
     title: "Old story",
+    confirmLocation: true,
     body: "Old plain text\n\nSecond paragraph",
     photos: ["/uploads/old.jpg"],
     cover: "/uploads/cover.jpg",

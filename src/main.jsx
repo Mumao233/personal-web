@@ -19,6 +19,8 @@ import { quotes } from "./quotes";
 import Survey from "./survey";
 import ArticleContent from "./article-content";
 import { ProfileFields } from "./profile-fields";
+import { sessionState, newSubmissionKey } from "./browser-state.js";
+import ModuleBoundary from "./module-boundary.jsx";
 import "./style.css";
 import "./space.css";
 const Admin = lazy(() => import("./admin"));
@@ -55,11 +57,11 @@ export function Text({ children }) {
     </div>
   );
 }
-function Intro() {
-  const [show, setShow] = useState(!sessionStorage.getItem("greeted"));
+export function Intro() {
+  const [show, setShow] = useState(() => !sessionState.getItem("greeted"));
   const [word, setWord] = useState(0);
   const finish = () => {
-    sessionStorage.setItem("greeted", "1");
+    sessionState.setItem("greeted", "1");
     setShow(false);
   };
   useEffect(() => {
@@ -142,7 +144,7 @@ function TypeQuote() {
       setText(sentence);
       timer = setTimeout(erase, 15000);
     } else
-      timer = setTimeout(step, sessionStorage.getItem("greeted") ? 550 : 2900);
+      timer = setTimeout(step, sessionState.getItem("greeted") ? 550 : 2900);
     return () => {
       disposed = true;
       clearTimeout(timer);
@@ -174,9 +176,11 @@ function App() {
   }, []);
   if (page === "admin")
     return (
-      <Suspense fallback={<div className="loading">正在打开后台…</div>}>
-        <Admin />
-      </Suspense>
+      <ModuleBoundary label="管理空间">
+        <Suspense fallback={<div className="loading">正在打开后台…</div>}>
+          <Admin />
+        </Suspense>
+      </ModuleBoundary>
     );
   if (!data)
     return (
@@ -194,6 +198,7 @@ function App() {
   return (
     <>
       <Intro />
+      <ModuleBoundary label="3D 场景" quiet>
       <Suspense fallback={null}>
         <Space
           home={
@@ -204,6 +209,7 @@ function App() {
           }
         />
       </Suspense>
+      </ModuleBoundary>
       <div
         className={`site-content ${page === "home" && !detailKind ? "is-home" : ""}`}
       >
@@ -525,11 +531,13 @@ function App() {
                     title="关于世界"
                     subtitle="用问题靠近世界，用照片留住片刻。"
                   />
+                  <ModuleBoundary label="世界地图">
                   <Suspense
                     fallback={<div className="loading">正在展开地球…</div>}
                   >
                     <World stories={data.stories} />
                   </Suspense>
+                  </ModuleBoundary>
                 </div>
               )}
               {page === "you" && (
@@ -616,7 +624,7 @@ function Contact({ p }) {
     </div>
   );
 }
-function Questions({ data, refresh }) {
+export function Questions({ data, refresh }) {
   const [b, setB] = useState({
       question: "",
       anonymous: true,
@@ -628,18 +636,29 @@ function Questions({ data, refresh }) {
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
     [key, setKey] = useState(""),
-    [found, setFound] = useState("");
-  const set = (k, v) => setB({ ...b, [k]: v });
+    [found, setFound] = useState(""),
+    [uncertain, setUncertain] = useState(false);
+  const attempt = useRef(null);
+  const inflight = useRef(false);
+  const set = (k, v) => setB(previous => ({ ...previous, [k]: v }));
   async function submit(e) {
     e.preventDefault();
+    if (inflight.current) return;
+    inflight.current = true;
     setBusy(true);
     setError("");
     try {
-      setResult(await api("/questions", { method: "POST", body: b }));
+      attempt.current ||= { ...b, submissionKey: newSubmissionKey() };
+      setResult(await api("/questions", { method: "POST", body: attempt.current }));
+      setUncertain(false);
       refresh();
     } catch (e) {
       setError(e.message);
+      const unknown = !e.status || e.status >= 500 || e.status === 429 || e.status === 408;
+      setUncertain(unknown);
+      if (!unknown) attempt.current = null;
     } finally {
+      inflight.current = false;
       setBusy(false);
     }
   }
@@ -691,7 +710,8 @@ function Questions({ data, refresh }) {
                 className="quiet"
                 onClick={() => {
                   setResult(null);
-                  setB({ ...b, question: "" });
+                  setB(previous => ({ ...previous, question: "" }));
+                  attempt.current = null;
                 }}
               >
                 再留一句话
@@ -699,6 +719,7 @@ function Questions({ data, refresh }) {
             </div>
           ) : (
             <form className="question-form" onSubmit={submit}>
+              <fieldset className="submission-fields" disabled={busy || uncertain}>
               <label>
                 想对我说什么？
                 <textarea
@@ -743,11 +764,14 @@ function Questions({ data, refresh }) {
               <label>
                 找回方式 <span className="optional">选填</span>
                 <input
+                  maxLength={320}
                   value={b.recovery}
                   onChange={(e) => set("recovery", e.target.value)}
                   placeholder="邮箱、手机号，或至少8位私密字符串"
                 />
               </label>
+              </fieldset>
+              {uncertain && <p className="fine" role="status">提交结果尚未确认。请重试确认这一次提交，系统不会重复保存。</p>}
               <p className="fine">
                 联系方式不会公开。收到回复后会发送通知；也可凭专属链接或私密字符串查看。
                 {b.public
@@ -761,10 +785,12 @@ function Questions({ data, refresh }) {
               )}
               <button
                 className="button"
-                disabled={busy || !data.profile.acceptQuestions}
+                disabled={busy || (!uncertain && !data.profile.acceptQuestions)}
               >
                 {busy
                   ? "正在提交…"
+                  : uncertain
+                    ? "重试确认提交结果"
                   : data.profile.acceptQuestions
                     ? "把话留在这里"
                     : "提问暂时关闭"}
@@ -779,6 +805,7 @@ function Questions({ data, refresh }) {
                 私密字符串／邮箱／手机号
                 <input
                   required
+                  maxLength={320}
                   value={key}
                   onChange={(e) => setKey(e.target.value)}
                 />

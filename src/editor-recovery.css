@@ -1,0 +1,43 @@
+.editor-recovery {
+  margin: 1.25rem 0;
+  padding: 1.25rem;
+  border: 1px solid #9e7958;
+  border-radius: 12px;
+  background: #151a20;
+  color: #e9e5dc;
+}
+.editor-recovery[role="dialog"] {
+  position: fixed;
+  inset: auto 1rem 1rem;
+  z-index: 150;
+  max-width: 760px;
+  margin: auto;
+}
+.editor-recovery::backdrop {
+  background: #000a;
+}
+.editor-recovery h3 {
+  margin-top: 0;
+}
+.editor-recovery textarea {
+  width: 100%;
+}
+.editor-fields:disabled {
+  opacity: 0.7;
+}
+fieldset.editor-fields {
+  border: 0;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+}
+.editor-form > .editor-fields > h2 {
+  margin: 40px 0 25px;
+  font-size: 22px;
+}
+.editor-form > .editor-fields > .button {
+  margin-top: 30px;
+}
+.editor-form > .editor-fields > .check {
+  margin: 20px 0;
+}

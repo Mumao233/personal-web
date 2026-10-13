@@ -7,6 +7,8 @@ import {
   Check,
 } from "@phosphor-icons/react";
 import { api } from "./api";
+import { newSubmissionKey } from "./browser-state.js";
+import { unchangedAnswers, downloadAnswerCopy } from "./survey-recovery.js";
 import {
   surveyFlow,
   answerError,
@@ -313,6 +315,12 @@ export default function Survey({ id, preview }) {
   const [resultsError, setResultsError] = useState("");
   const [draft, setDraft] = useState(false);
   const [storageUnavailable, setStorageUnavailable] = useState(false);
+  const [versionConflict, setVersionConflict] = useState(false);
+  const [uncertain, setUncertain] = useState(false);
+  const [previousCopy, setPreviousCopy] = useState(null);
+  const submissionKey = useRef(null);
+  const attempt = useRef(null);
+  const inflight = useRef(false);
 
   const setCurrentAnswers = (next) => {
     answersRef.current = next;
@@ -323,7 +331,14 @@ export default function Survey({ id, preview }) {
     try {
       localStorage.setItem(
         "survey-" + id,
-        JSON.stringify({ revision: currentSurvey.updatedAt, answers: next }),
+        JSON.stringify({
+          revision: currentSurvey.updatedAt,
+          definitionVersion: currentSurvey.definitionVersion,
+          submissionKey: submissionKey.current,
+          pending: Boolean(attempt.current),
+          surveySnapshot: currentSurvey,
+          answers: next,
+        }),
       );
       setDraft(true);
       setStorageUnavailable(false);
@@ -352,36 +367,70 @@ export default function Survey({ id, preview }) {
     setResultsError("");
     setDraft(false);
     setStorageUnavailable(false);
+    setVersionConflict(false);
+    setUncertain(false);
+    setPreviousCopy(null);
+    submissionKey.current = newSubmissionKey();
+    attempt.current = null;
     if (preview) {
       setSurvey(preview);
       return;
     }
     setSurvey(null);
+    let stored = null;
+    try {
+      const candidate = JSON.parse(localStorage.getItem("survey-" + id) || "null");
+      if (candidate?.answers && typeof candidate.answers === "object" && !Array.isArray(candidate.answers)) stored = candidate;
+    } catch { setStorageUnavailable(true); }
+    const storedSnapshot = stored?.surveySnapshot?.id === id && Array.isArray(stored.surveySnapshot.questions)
+      ? stored.surveySnapshot : null;
+    // Receipt confirmation must work even when the public questionnaire has
+    // closed since the original request. Do not gate it on a fresh public GET.
+    if (stored?.pending && typeof stored.submissionKey === "string" && storedSnapshot) {
+      submissionKey.current = stored.submissionKey;
+      attempt.current = { answers: stored.answers, definitionVersion: stored.definitionVersion, submissionKey: stored.submissionKey };
+      setSurvey(storedSnapshot);
+      setCurrentAnswers(stored.answers);
+      setUncertain(true);
+      setDraft(true);
+      return () => { active = false; };
+    }
     api("/surveys/" + id)
       .then((s) => {
         if (!active) return;
         setSurvey(s);
-        try {
-          const stored = JSON.parse(
-            localStorage.getItem("survey-" + id) || "null",
-          );
+        if (stored) {
           if (
             stored &&
-            stored.revision === s.updatedAt &&
+            (stored.definitionVersion === s.definitionVersion || (!stored.definitionVersion && stored.revision === s.updatedAt)) &&
             stored.answers &&
             typeof stored.answers === "object" &&
             !Array.isArray(stored.answers)
           ) {
+            submissionKey.current = stored.submissionKey || submissionKey.current;
             const clean = pruneSurveyAnswers(s, stored.answers);
             setCurrentAnswers(clean);
             storeDraft(s, clean);
+          } else {
+            // Legacy drafts have no definition snapshot. Keep their answers
+            // downloadable, but never attach them to newly worded questions.
+            setSurvey(storedSnapshot || { id, title: s.title, questions: [], definitionVersion: stored.definitionVersion });
+            setCurrentAnswers(stored.answers);
+            setVersionConflict(true);
+            setDraft(true);
           }
-        } catch {
-          setStorageUnavailable(true);
         }
       })
       .catch((e) => {
-        if (active) setError(e.message);
+        if (active) {
+          setError(e.message);
+          if (stored) {
+            setSurvey(storedSnapshot || { id, title: "已保存的问卷草稿", questions: [], definitionVersion: stored.definitionVersion });
+            setCurrentAnswers(stored.answers);
+            setVersionConflict(true);
+            setDraft(true);
+          }
+        }
       });
     return () => {
       active = false;
@@ -389,7 +438,7 @@ export default function Survey({ id, preview }) {
   }, [id, preview]);
 
   const change = (key, value) => {
-    if (busy) return;
+    if (busy || uncertain || versionConflict) return;
     const before = surveyFlow(survey, answersRef.current);
     const clean = pruneSurveyAnswers(survey, {
       ...answersRef.current,
@@ -448,6 +497,11 @@ export default function Survey({ id, preview }) {
     return false;
   };
   const clearAnswers = () => {
+    submissionKey.current = newSubmissionKey();
+    attempt.current = null;
+    setUncertain(false);
+    setVersionConflict(false);
+    setPreviousCopy(null);
     removeDraft();
     setCurrentAnswers({});
     setSection(0);
@@ -457,6 +511,28 @@ export default function Survey({ id, preview }) {
     setSuccess(null);
     setResults(null);
     setResultsError("");
+  };
+  const reloadSurvey = async () => {
+    if (inflight.current) return;
+    inflight.current = true;
+    setBusy(true);
+    try {
+      const current = await api("/surveys/" + id);
+      const previous = { survey, answers: structuredClone(answersRef.current) };
+      const clean = pruneSurveyAnswers(current, unchangedAnswers(survey, current, answersRef.current));
+      setPreviousCopy(previous);
+      submissionKey.current = newSubmissionKey();
+      attempt.current = null;
+      setSurvey(current);
+      setCurrentAnswers(clean);
+      setSection(0);
+      setFieldErrors({});
+      setError("");
+      setVersionConflict(false);
+      setUncertain(false);
+      storeDraft(current, clean);
+    } catch (e) { setError(e.message); }
+    finally { inflight.current = false; setBusy(false); }
   };
   const loadResults = async () => {
     setResultsError("");
@@ -468,13 +544,13 @@ export default function Survey({ id, preview }) {
   };
   async function submit(e) {
     e.preventDefault();
-    if (busy) return;
+    if (inflight.current || versionConflict) return;
     setError("");
-    if (!lastSection) {
+    if (!attempt.current && !lastSection) {
       if (check(active)) setSection(current + 1);
       return;
     }
-    if (!check(questions)) return;
+    if (!attempt.current && !check(questions)) return;
     if (preview) {
       setSuccess({
         message: termination
@@ -486,12 +562,16 @@ export default function Survey({ id, preview }) {
       return;
     }
     setBusy(true);
+    inflight.current = true;
     try {
       const clean = pruneSurveyAnswers(survey, answersRef.current);
+      attempt.current ||= { answers: clean, definitionVersion: survey.definitionVersion, submissionKey: submissionKey.current || newSubmissionKey() };
+      storeDraft(survey, attempt.current.answers);
       const result = await api("/surveys/" + id + "/submit", {
         method: "POST",
-        body: { answers: clean },
+        body: attempt.current,
       });
+      setUncertain(false);
       setSuccess({
         message: result.message || "回答已保存。",
         completion: result.completion,
@@ -502,7 +582,15 @@ export default function Survey({ id, preview }) {
       if (survey.publicResults) await loadResults();
     } catch (e) {
       setError(e.message);
+      const unknown = !e.status || e.status >= 500 || e.status === 429 || e.status === 408;
+      setUncertain(unknown);
+      if (!unknown) {
+        attempt.current = null;
+        storeDraft(survey, answersRef.current);
+      }
+      if (e.code === "SURVEY_VERSION_CONFLICT") setVersionConflict(true);
     } finally {
+      inflight.current = false;
       setBusy(false);
     }
   }
@@ -543,10 +631,19 @@ export default function Survey({ id, preview }) {
         </div>
       ) : (
         <form onSubmit={submit} noValidate>
+          {versionConflict && (
+            <section className="module-recovery" role="alert">
+              <p>问卷已经更新，当前答案仍保留。加载新版后，只有题目定义未变化的答案会保留，其他题目请重新确认。</p>
+              <button type="button" className="quiet" onClick={() => downloadAnswerCopy(survey, answersRef.current)}>下载当前填写副本</button>{" "}
+              <button type="button" className="quiet" disabled={busy} onClick={reloadSurvey}>加载最新问卷</button>
+            </section>
+          )}
+          {previousCopy && <p className="draft-note">已加载最新问卷，请确认变更的题目。 <button type="button" onClick={() => downloadAnswerCopy(previousCopy.survey, previousCopy.answers)}>下载更新前的填写副本</button></p>}
+          {uncertain && <p className="draft-note" role="status">上一次提交结果尚未确认。重试会确认同一次提交，不会重复保存。</p>}
           {draft && (
             <p className="draft-note">
               已保存本机草稿 · 刷新后可继续{" "}
-              <button type="button" disabled={busy} onClick={clearAnswers}>
+              <button type="button" disabled={busy || uncertain || versionConflict} onClick={clearAnswers}>
                 清除
               </button>
             </p>
@@ -577,7 +674,7 @@ export default function Survey({ id, preview }) {
               {current + 1} / {Math.max(1, sections.length)}
             </span>
           </div>
-          <fieldset className="survey-active-section" disabled={busy}>
+          <fieldset className="survey-active-section" disabled={busy || uncertain || versionConflict}>
             <legend className="survey-sr-only">
               {sections[current]?.title || "当前部分"}
             </legend>
@@ -616,7 +713,7 @@ export default function Survey({ id, preview }) {
               <button
                 type="button"
                 className="quiet"
-                disabled={busy}
+                disabled={busy || uncertain || versionConflict}
                 onClick={() => {
                   setSection(current - 1);
                   setError("");
@@ -625,9 +722,11 @@ export default function Survey({ id, preview }) {
                 <ArrowLeft /> 上一部分
               </button>
             )}
-            <button className="button" disabled={busy}>
+            <button className="button" disabled={busy || versionConflict}>
               {busy
                 ? "正在保存…"
+                : uncertain
+                  ? "重试确认提交结果"
                 : !lastSection
                   ? "下一部分"
                   : termination

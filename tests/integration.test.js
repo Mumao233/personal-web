@@ -7,7 +7,14 @@ import { join } from "node:path";
 import ExcelJS from "exceljs";
 let child, dir, cookie;
 const base = "http://127.0.0.1:5187";
+const definitionVersions = new Map();
 const call = async (path, method = "GET", body, admin = false) => {
+  const surveyIdForSubmit = path.match(/^\/surveys\/([^/]+)\/submit$/)?.[1];
+  if (surveyIdForSubmit)
+    body = {
+      definitionVersion: definitionVersions.get(surveyIdForSubmit),
+      ...body,
+    };
   const r = await fetch(base + "/api" + path, {
     method,
     headers: {
@@ -17,6 +24,8 @@ const call = async (path, method = "GET", body, admin = false) => {
     body: body ? JSON.stringify(body) : undefined,
   });
   const data = await r.json();
+  if (data.id && data.definitionVersion)
+    definitionVersions.set(data.id, data.definitionVersion);
   return { r, data };
 };
 async function start() {
@@ -299,7 +308,7 @@ test("content drafts, closed surveys and administrator controls", async () => {
       .status,
     403,
   );
-  const profile = (await call("/public")).data.profile;
+  const profile = (await call("/admin", "GET", undefined, true)).data.profile;
   await call(
     "/admin/profile",
     "PUT",

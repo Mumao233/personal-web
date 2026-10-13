@@ -1,6 +1,7 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
 import App from "./main.jsx";
+import ModuleBoundary from "./module-boundary.jsx";
 
 // Preserve the root if Vite reloads this entry; components refresh independently.
 const root =
@@ -9,4 +10,4 @@ if (import.meta.hot)
   import.meta.hot.dispose((data) => {
     data.root = root;
   });
-root.render(<App />);
+root.render(<ModuleBoundary label="个人空间"><App /></ModuleBoundary>);

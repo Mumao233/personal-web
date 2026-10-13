@@ -95,6 +95,7 @@ const survey = await call(
 );
 for (let index = 0; index < 4; index++) {
   await call(`/surveys/${survey.id}/submit`, {
+    definitionVersion: survey.definitionVersion,
     answers: {
       screen: "继续",
       interests: index === 0 ? ["以上都无"] : ["摄影", "音乐"],
@@ -109,7 +110,10 @@ for (let index = 0; index < 4; index++) {
   });
 }
 for (let index = 0; index < 2; index++)
-  await call(`/surveys/${survey.id}/submit`, { answers: { screen: "结束" } });
+  await call(`/surveys/${survey.id}/submit`, {
+    definitionVersion: survey.definitionVersion,
+    answers: { screen: "结束" },
+  });
 console.log(`Advanced QA server: http://localhost:${port}/?page=admin`);
 console.log(
   `Advanced QA survey: http://localhost:${port}/?survey=${survey.id}`,

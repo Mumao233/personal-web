@@ -69,3 +69,9 @@ test('gateway preserves Atlas byte ranges, HEAD and same-origin write protection
   const status = await fetch(base + '/__local/status');
   assert.equal((await status.json()).application, 'solar-system-atlas');
 });
+
+test('terrain attribution is publicly served through the integrated site', async () => {
+  const result = await fetch(base + '/credits/Mapzen-terrain-attribution.md');
+  assert.equal(result.status, 200);
+  assert.match(await result.text(), /https:\/\/github\.com\/tilezen\/joerd\/blob\/master\/docs\/attribution\.md/);
+});
