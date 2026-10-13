@@ -55,6 +55,7 @@ import {
   publicContent,
   validatePublication,
 } from "./content.js";
+import { saveContentDraft, transitionContent } from "./admin-content.js";
 const app = express();
 const port = Number(process.env.PORT || 5193);
 const atlas =
@@ -405,6 +406,28 @@ app.post(
         termination,
       };
       transaction(() => {
+        // The assistant CLI can publish through another SQLite connection.
+        // Recheck under the write lock so a new live definition cannot race
+        // between the initial request validation and this answer's commit.
+        const current = get("surveys", req.params.id);
+        if (!current?.published)
+          throw Object.assign(Error("问卷不存在"), { status: 404 });
+        if (
+          current.closed ||
+          (current.startsAt && Date.now() < Date.parse(current.startsAt)) ||
+          (current.endsAt && Date.now() > Date.parse(current.endsAt))
+        )
+          throw Object.assign(Error("问卷尚未开始或已结束"), { status: 403 });
+        if (
+          versionedSurvey(current).definitionVersion !==
+          req.body.definitionVersion
+        )
+          throw Object.assign(
+            Error(
+              "问卷内容已更新，请重新载入当前问卷再填写。此次回答尚未保存。",
+            ),
+            { status: 409, code: "SURVEY_VERSION_CONFLICT" },
+          );
         put("submissions", submission);
         saveReceipt(req.receipt, "submissions", submission.id, response);
       });
@@ -523,13 +546,16 @@ app.get(
 );
 app.put("/api/admin/profile", (req, res, next) => {
   try {
-    const old = setting("profile");
-    assertRevision(old, req.body.revision, "PROFILE_REVISION_CONFLICT");
-    const profile = {
-      ...normalizeProfile(old, req.body),
-      revision: revisionOf(old) + 1,
-    };
-    setSetting("profile", profile);
+    const profile = transaction(() => {
+      const old = setting("profile");
+      assertRevision(old, req.body.revision, "PROFILE_REVISION_CONFLICT");
+      const saved = {
+        ...normalizeProfile(old, req.body),
+        revision: revisionOf(old) + 1,
+      };
+      setSetting("profile", saved);
+      return saved;
+    });
     res.json({ profile });
   } catch (error) {
     error.status ||= 400;
@@ -563,67 +589,42 @@ for (const kind of ["projects", "posts", "stories"]) {
   });
   app.put(`/api/admin/${kind}/:id/draft`, (req, res, next) => {
     try {
-      const isNew = req.params.id === "new";
-      const old = isNew ? null : get(kind, req.params.id);
-      if (!isNew && !old)
-        return res.status(404).json({ error: "文章不存在，可能已被删除" });
-      checkRevision(old, req.body?.revision);
-      const now = new Date().toISOString();
-      const draft = editableContent(req.body, old?.draft || old || {});
-      const record = {
-        ...(old || {
-          id: randomUUID(),
-          title: "",
-          body: "",
-          published: false,
-          createdAt: now,
-        }),
-        draft,
-        draftSavedAt: now,
-        revision: contentRevision(old) + 1,
-      };
-      // Saving a draft never changes live fields or their last-published time.
-      res.json(put(kind, record));
+      res.json(
+        saveContentDraft(
+          { get, put, transaction },
+          kind,
+          req.params.id,
+          req.body,
+        ),
+      );
     } catch (error) {
       next(error);
     }
   });
   app.post(`/api/admin/${kind}/:id/publish`, (req, res, next) => {
     try {
-      const old = get(kind, req.params.id);
-      if (!old) return res.status(404).json({ error: "文章不存在" });
-      checkRevision(old, req.body?.revision);
-      const content = editableContent(old.draft || old);
-      validatePublication(kind, content);
-      const { draft, draftSavedAt, ...live } = old;
-      const now = new Date().toISOString();
-      res.json(
-        put(kind, {
-          ...live,
-          ...content,
-          published: true,
-          publishedAt: old.publishedAt || now,
-          updatedAt: now,
-          revision: contentRevision(old) + 1,
-        }),
+      const saved = transitionContent(
+        { get, put, transaction },
+        kind,
+        req.params.id,
+        req.body,
+        "publish",
       );
+      res.json(saved);
     } catch (error) {
       next(error);
     }
   });
   app.post(`/api/admin/${kind}/:id/unpublish`, (req, res, next) => {
     try {
-      const old = get(kind, req.params.id);
-      if (!old) return res.status(404).json({ error: "文章不存在" });
-      checkRevision(old, req.body?.revision);
-      res.json(
-        put(kind, {
-          ...old,
-          published: false,
-          revision: contentRevision(old) + 1,
-          updatedAt: new Date().toISOString(),
-        }),
+      const saved = transitionContent(
+        { get, put, transaction },
+        kind,
+        req.params.id,
+        req.body,
+        "unpublish",
       );
+      res.json(saved);
     } catch (error) {
       next(error);
     }
@@ -634,18 +635,18 @@ for (const kind of ["projects", "posts", "stories", "surveys"]) {
     try {
       const b = req.body;
       const id = req.params.id === "new" ? randomUUID() : req.params.id;
-      const old = get(kind, id);
       if (kind !== "surveys") {
-        if (b.revision !== undefined) checkRevision(old, b.revision);
-        const content = editableContent(b, old || {});
-        validatePublication(kind, content, {
-          requireLocationConfirmation:
-            b.published === true ||
-            (b.published === undefined && old?.published === true),
-        });
-        const { draft, draftSavedAt, ...previous } = old || {};
-        return res.json(
-          put(kind, {
+        const saved = transaction(() => {
+          const old = get(kind, id);
+          if (b.revision !== undefined) checkRevision(old, b.revision);
+          const content = editableContent(b, old || {});
+          validatePublication(kind, content, {
+            requireLocationConfirmation:
+              b.published === true ||
+              (b.published === undefined && old?.published === true),
+          });
+          const { draft, draftSavedAt, ...previous } = old || {};
+          return put(kind, {
             ...previous,
             ...content,
             id,
@@ -656,15 +657,19 @@ for (const kind of ["projects", "posts", "stories", "surveys"]) {
             revision: contentRevision(old) + 1,
             createdAt: old?.createdAt || new Date().toISOString(),
             updatedAt: new Date().toISOString(),
-          }),
-        );
+          });
+        });
+        return res.json(saved);
       }
-      if (req.params.id !== "new" && !old)
-        return res.status(404).json({ error: "问卷不存在，可能已被删除" });
-      if (old) assertRevision(old, b.revision, "SURVEY_REVISION_CONFLICT");
-      validateSurvey(b);
-      res.json(
-        put(
+      const saved = transaction(() => {
+        const old = get(kind, id);
+        if (req.params.id !== "new" && !old)
+          throw Object.assign(Error("问卷不存在，可能已被删除"), {
+            status: 404,
+          });
+        if (old) assertRevision(old, b.revision, "SURVEY_REVISION_CONFLICT");
+        validateSurvey(b);
+        return put(
           kind,
           versionedSurvey({
             ...b,
@@ -673,8 +678,9 @@ for (const kind of ["projects", "posts", "stories", "surveys"]) {
             createdAt: old?.createdAt || new Date().toISOString(),
             updatedAt: new Date().toISOString(),
           }),
-        ),
-      );
+        );
+      });
+      res.json(saved);
     } catch (e) {
       e.status ||= 400;
       next(e);

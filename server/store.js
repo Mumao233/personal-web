@@ -6,7 +6,7 @@ mkdirSync(dataDir, { recursive: true });
 mkdirSync(resolve(dataDir, "uploads"), { recursive: true });
 export const db = new DatabaseSync(resolve(dataDir, "space.sqlite"));
 db.exec(
-  `PRAGMA journal_mode=WAL; CREATE TABLE IF NOT EXISTS records (kind TEXT NOT NULL,id TEXT NOT NULL,body TEXT NOT NULL,PRIMARY KEY(kind,id)); CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY,value TEXT NOT NULL);`,
+  `PRAGMA busy_timeout=5000; PRAGMA journal_mode=WAL; CREATE TABLE IF NOT EXISTS records (kind TEXT NOT NULL,id TEXT NOT NULL,body TEXT NOT NULL,PRIMARY KEY(kind,id)); CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY,value TEXT NOT NULL);`,
 );
 export const list = (kind) =>
   db

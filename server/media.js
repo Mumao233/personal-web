@@ -1,36 +1,16 @@
 import multer from "multer";
 import sharp from "sharp";
-import { randomUUID, createHash } from "node:crypto";
-import { resolve, extname } from "node:path";
-import { mkdir, readFile, writeFile, rename, unlink, stat } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
+import { extname } from "node:path";
+import { readFile, unlink } from "node:fs/promises";
 import { dataDir, list, setting } from "./store.js";
 import { publicContent } from "./content.js";
 import { publicProfile } from "./profile.js";
+import { mediaDirectories, prepareMedia, savePreparedMedia, sanitizedMediaFile, validMediaBasename } from "./media-processing.js";
+export { sanitizeImage } from "./media-processing.js";
 
-const uploads = resolve(dataDir, "uploads");
-const incoming = resolve(dataDir, "media-incoming");
-const cache = resolve(dataDir, "media-cache");
-await Promise.all([uploads, incoming, cache].map(path => mkdir(path, { recursive: true })));
-const raster = new Set(["jpeg", "png", "webp", "gif"]);
+const { incoming } = await mediaDirectories(dataDir, { create: true, incoming: true });
 const error400 = message => Object.assign(new Error(message), { status: 400 });
-
-export async function sanitizeImage(input) {
-  try {
-    // Decode and re-encode every frame; sharp strips EXIF/IPTC/XMP by default,
-    // applies orientation, and converts colour to sRGB without retaining GPS.
-    // Buffers avoid libvips retaining an animated input's Windows file handle
-    // after completion, so incoming originals can be removed before responding.
-    const bytes = typeof input === "string" ? await readFile(input) : input;
-    const image = sharp(bytes, { animated: true, limitInputPixels: 60_000_000 });
-    const metadata = await image.metadata();
-    if (!raster.has(metadata.format)) throw error400("仅支持 JPG、PNG、WebP 和 GIF 图片");
-    const buffer = await image.rotate().toBuffer();
-    return { buffer, extension: metadata.format === "jpeg" ? ".jpg" : `.${metadata.format}` };
-  } catch (error) {
-    if (error.status) throw error;
-    throw error400("图片无法读取或尺寸过大，请重新导出后上传");
-  }
-}
 
 function references(value, name) {
   if (typeof value === "string") {
@@ -56,28 +36,6 @@ export function isPublicMedia(name) {
   );
 }
 
-const pending = new Map();
-const cachePath = (name, info) => resolve(cache, createHash("sha256")
-  .update(`${name}:${info.size}:${info.mtimeMs}:v1`).digest("hex") + extname(name).toLowerCase());
-async function sanitizedFile(name) {
-  const source = resolve(uploads, name);
-  const info = await stat(source);
-  if (extname(name).toLowerCase() === ".pdf") return source;
-  const destination = cachePath(name, info);
-  const key = destination;
-  try { await stat(destination); return destination; } catch (e) { if (e.code !== "ENOENT") throw e; }
-  if (!pending.has(key)) {
-    pending.set(key, (async () => {
-      const { buffer } = await sanitizeImage(source);
-      const temporary = destination + "." + randomUUID() + ".tmp";
-      await writeFile(temporary, buffer, { flag: "wx", mode: 0o600 });
-      await rename(temporary, destination);
-      return destination;
-    })().finally(() => pending.delete(key)));
-  }
-  return pending.get(key);
-}
-
 const upload = multer({
   storage: multer.diskStorage({
     destination: incoming,
@@ -92,32 +50,21 @@ const upload = multer({
 
 export function registerMediaRoutes(app, auth) {
   app.post("/api/admin/upload", auth, upload.array("files", 20), async (req, res, next) => {
-    const created = [];
+    const rollbacks = [];
     let response, failure;
     try {
       if (!req.files?.length) throw error400("请选择要上传的文件");
       const files = [];
+      // Keep only one incoming image in memory at a time on the small ECS host.
       for (const file of req.files) {
-        let buffer, extension;
-        if (extname(file.originalname).toLowerCase() === ".pdf") {
-          buffer = await readFile(file.path);
-          if (!buffer.subarray(0, 5).equals(Buffer.from("%PDF-"))) throw error400("PDF 文件内容无效");
-          extension = ".pdf";
-        } else ({ buffer, extension } = await sanitizeImage(file.path));
-        const name = randomUUID() + extension;
-        const destination = resolve(uploads, name);
-        await writeFile(destination, buffer, { flag: "wx", mode: 0o600 });
-        created.push(destination);
-        if (extension !== ".pdf") {
-          const cleanCopy = cachePath(name, await stat(destination));
-          await writeFile(cleanCopy, buffer, { flag: "wx", mode: 0o600 });
-          created.push(cleanCopy);
-        }
-        files.push({ url: "/uploads/" + name, name: file.originalname });
+        const prepared = await prepareMedia([{ name: file.originalname, buffer: await readFile(file.path) }]);
+        const saved = await savePreparedMedia(dataDir, prepared);
+        files.push(...saved.files);
+        rollbacks.push(saved.rollback);
       }
       response = { files };
     } catch (error) {
-      await Promise.all(created.map(path => unlink(path).catch(() => {})));
+      for (const rollback of rollbacks.reverse()) await rollback().catch(() => {});
       failure = error;
     } finally {
       await Promise.all((req.files || []).map(file => unlink(file.path).catch(() => {})));
@@ -134,11 +81,11 @@ export function registerMediaRoutes(app, auth) {
       "X-Content-Type-Options": "nosniff",
     });
     const name = req.path.slice(1);
-    if (!["GET", "HEAD"].includes(req.method) || !/^[a-z0-9][a-z0-9._-]*\.(?:jpe?g|png|webp|gif|pdf)$/i.test(name) || name.includes(".."))
+    if (!["GET", "HEAD"].includes(req.method) || !validMediaBasename(name))
       return res.status(404).json({ error: "文件不存在" });
     const send = async () => {
       try {
-        const path = await sanitizedFile(name);
+        const path = await sanitizedMediaFile(dataDir, name);
         // Legacy uploads may have a misleading suffix. Derive MIME from the
         // sanitized bytes, not the old filename, with nosniff still enabled.
         if (extname(name).toLowerCase() === ".pdf") res.type("application/pdf");
