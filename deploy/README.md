@@ -106,3 +106,14 @@ systemd 使用固定 `ExecStartPre` 命令创建并设置 `/opt/personal-web/dat
 - 在真实 Linux 上使用独立 oneshot unit，保留同样的 `User`／`Group`、`ExecStartPre=+ install`、`ProtectSystem=strict` 与可选 `ReadWritePaths`；从不存在的 data／runtime 目录启动成功，`Result=success`、退出码 0，两目录正确创建且 `personal-web` 可写。
 
 这些是部署前和隔离检查的实际结果，尚不代替新版本正式服务切换、Nginx 加载及线上版本一致性的验收记录。
+
+### v1.0.1 实际部署结果（2026-10-13）
+
+- 首次尝试在服务器构建时命令超时，SSH／云助手与 HTTPS 暂时失去响应；用户补充实例重启权限后执行正常重启，旧站恢复，SQLite 完整性检查通过。随后使用本地已验证的前端构建，不再在该 2 GB 级实例运行 Vite 构建。
+- Linux 重新安装依赖，Sharp 原生库可用；图片隐私专项 10／10 通过。网关测试先因 shell 未指定 `PYTHON` 而找不到 `python`，补上与生产 unit 一致的 `/usr/bin/python3` 后 1／1 通过。
+- 切换前备份到 `/opt/personal-web/backups/v1.0.1`：一致性 `space.sqlite`、`uploads.tar.gz`、旧 Nginx／systemd 配置，以及 `app-previous` 完整旧应用。切换脚本提供失败时恢复旧应用的路径，不恢复旧数据库覆盖新增内容。
+- 保留原 Atlas 运行缓存；Nginx 只更新 setup 路径规则，保留现有 TLS 证书与配置。`nginx -t` 通过，正式 systemd 服务 `active/running`、开机启动已启用，启动后无自动重启。
+- 切换前后数据库内容与设置摘要、全部上传原件摘要一致；SQLite 完整性正常。原有 4 个项目、1 份问卷、2 份答卷和 1 个上传文件保留，没有向生产写入验收内容。
+- 公网 HTTPS 首页、太阳系、健康接口、状态接口和地形署名均为 200；健康接口 `atlas:true`，初始化状态 `needsSetup:false`。匿名后台及大小写别名为 401，setup 别名为 403，敏感文件路径为 404。
+- 现有公开图片匿名返回 200，带 `private, no-store`，响应图片无 EXIF／XMP／IPTC；未修改私有上传原件。
+- 部署源码逐文件核对 Git 内容，前端包校验 SHA-256。准确发布提交与版本记录在应用目录的 `release.json`，对应附注标签 `v1.0.1`。
