@@ -58,7 +58,7 @@ systemd 确认 active (running)、enabled，Node 与 Python 均在服务进程�
 
 ## v1.0.1 升级要求
 
-本版涉及应用代码、Sharp 图片处理依赖、Nginx 和 systemd 配置。必须在 Linux 部署目标安装对应依赖并构建，不能把 Windows 的 `node_modules` 复制上去。数据库和上传目录继续使用 `/opt/personal-web/data`，先做 SQLite 一致性备份及上传文件备份，再切换应用；保留旧应用以便回滚。
+本版涉及应用代码、Sharp 图片处理依赖、Nginx 和 systemd 配置。必须在 Linux 部署目标安装对应依赖，不能把 Windows 的 `node_modules` 复制上去。前端 `dist` 可在本地构建后随源码部署；小内存服务器应采用这一方式，避免在线构建挤占正在运行的网站资源。数据库和上传目录继续使用 `/opt/personal-web/data`，先做 SQLite 一致性备份及上传文件备份，再切换应用；保留旧应用以便回滚。
 
 ### 管理员初始化
 
