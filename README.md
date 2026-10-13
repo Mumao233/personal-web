@@ -55,9 +55,11 @@ npm run build
 
 ## 仓库与部署
 
-私有仓库：https://github.com/Mumao233/personal-web
+源码仓库：https://github.com/Mumao233/personal-web
 
 线上网站：https://mumao.site/ · [阿里云部署记录](deploy/README.md)
+
+当前版本：**v1.0.0**。版本变化见 [更新日志](CHANGELOG.md)，发布约定见 [版本发布流程](docs/releases.md)。
 
 此仓库保存整合网站的完整源码。克隆后按“启动”一节安装依赖并运行；本地私有数据库、上传文件、运行缓存和构建产物不包含在仓库中。
 完整站包含 Node/SQLite 与 Python 服务，不能仅把静态 HTML 上传 GitHub Pages。正式上线需支持这两个服务的主机、HTTPS 及持久数据目录。
