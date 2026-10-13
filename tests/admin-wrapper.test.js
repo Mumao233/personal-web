@@ -1,6 +1,14 @@
 import { test, after } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, writeFile, rm, readdir } from "node:fs/promises";
+import {
+  mkdtemp,
+  readFile,
+  writeFile,
+  rm,
+  readdir,
+  mkdir,
+} from "node:fs/promises";
+import { spawnSync } from "node:child_process";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { JSDOM } from "jsdom";
@@ -10,6 +18,7 @@ import {
   parseArguments,
   parseWorkbenchResult,
   validateRemoteDirectory,
+  acquireWorkbenchLock,
 } from "../scripts/admin-workbench.mjs";
 import {
   renderPreview,
@@ -290,6 +299,91 @@ test("empty transfer failures, timeouts and arbitrary non-JSON output fail close
     !transport.calls.some((args) =>
       args.some((arg) => arg.includes("server/admin-cli.js")),
     ),
+  );
+});
+
+test("Workbench coordination rejects a concurrent second process with ADMIN_BUSY before transport", async () => {
+  const base = await directory();
+  const lockDirectory = join(base, "instance.lock");
+  const release = await acquireWorkbenchLock({ directory: lockDirectory });
+  try {
+    const child = spawnSync(
+      process.execPath,
+      [
+        "--input-type=module",
+        "-e",
+        `import {runRemoteRequest} from ${JSON.stringify(new URL("../scripts/admin-workbench.mjs", import.meta.url).href)}; let transportCalled=false; const result=await runRemoteRequest({action:'list',kind:'posts'}, {lockDirectory:process.argv[1], executor:async()=>{transportCalled=true;throw Error('must not call')}}); console.log(JSON.stringify({result,transportCalled}));`,
+        lockDirectory,
+      ],
+      { encoding: "utf8", windowsHide: true },
+    );
+    assert.equal(child.status, 0);
+    const { result, transportCalled } = JSON.parse(child.stdout);
+    assert.equal(result.ok, false);
+    assert.equal(result.code, "ADMIN_BUSY");
+    assert.equal(transportCalled, false);
+    assert.match(result.error, /原 requestId/);
+  } finally {
+    await release();
+  }
+  const transport = mockTransport();
+  assert.equal(
+    (
+      await runRemoteRequest(
+        { action: "list", kind: "posts" },
+        { ...transport, lockDirectory },
+      )
+    ).ok,
+    true,
+  );
+  assert.deepEqual(await readdir(base), []);
+});
+
+test("Workbench coordination reclaims a known exited owner but never a foreign lock", async () => {
+  const base = await directory();
+  const lockDirectory = join(base, "instance.lock");
+  const child = spawnSync(
+    process.execPath,
+    [
+      "--input-type=module",
+      "-e",
+      `import {acquireWorkbenchLock} from ${JSON.stringify(new URL("../scripts/admin-workbench.mjs", import.meta.url).href)}; await acquireWorkbenchLock({directory:process.argv[1]});`,
+      lockDirectory,
+    ],
+    { encoding: "utf8", windowsHide: true },
+  );
+  assert.equal(child.status, 0);
+  const stale = JSON.parse(
+    await readFile(join(lockDirectory, "owner.json"), "utf8"),
+  );
+  assert.notEqual(stale.pid, process.pid);
+  const transport = mockTransport();
+  const recovered = await runRemoteRequest(
+    { action: "list", kind: "posts" },
+    { ...transport, lockDirectory },
+  );
+  assert.equal(recovered.ok, true);
+  assert.deepEqual(await readdir(base), []);
+  await mkdir(lockDirectory);
+  await writeFile(
+    join(lockDirectory, "owner.json"),
+    JSON.stringify({ ...stale, tool: "different-tool" }),
+  );
+  let called = false;
+  const blocked = await runRemoteRequest(
+    { action: "list", kind: "posts" },
+    {
+      lockDirectory,
+      executor: async () => {
+        called = true;
+      },
+    },
+  );
+  assert.equal(blocked.code, "ADMIN_BUSY");
+  assert.equal(called, false);
+  assert.equal(
+    JSON.parse(await readFile(join(lockDirectory, "owner.json"), "utf8")).tool,
+    "different-tool",
   );
 });
 

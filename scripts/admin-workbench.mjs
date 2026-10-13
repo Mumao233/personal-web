@@ -1,5 +1,15 @@
 import { spawn } from "node:child_process";
-import { readFile, writeFile, mkdtemp, rm, stat } from "node:fs/promises";
+import {
+  readFile,
+  writeFile,
+  mkdtemp,
+  rm,
+  stat,
+  mkdir,
+  rmdir,
+  unlink,
+} from "node:fs/promises";
+import { randomUUID } from "node:crypto";
 import { tmpdir } from "node:os";
 import { join, resolve, basename } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -21,6 +31,11 @@ const common = [
 const remotePattern = /^\/tmp\/personal-web-admin-input\.[A-Za-z0-9]{10}$/;
 const maxJSONBytes = 42 * 1024 * 1024;
 const maxInputBytes = 1024 * 1024;
+const LOCK_TOOL = "personal-web-admin-workbench-v1";
+const LOCK_DIRECTORY = join(
+  tmpdir(),
+  "personal-web-admin-workbench-i-7xvfvftrswzogb3o6n05.lock",
+);
 const object = (value) =>
   value && typeof value === "object" && !Array.isArray(value);
 
@@ -46,6 +61,93 @@ function safeFailure(code, message, extra) {
   const error = failure(code, message, extra);
   error.safeMessage = message;
   return error;
+}
+
+function ownerAlive(pid) {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return error.code !== "ESRCH";
+  }
+}
+
+async function readLockOwner(directory) {
+  try {
+    const path = join(directory, "owner.json");
+    if ((await stat(path)).size > 1024) return null;
+    const owner = JSON.parse(await readFile(path, "utf8"));
+    return owner.tool === LOCK_TOOL &&
+      Number.isInteger(owner.pid) &&
+      owner.pid > 0 &&
+      /^[a-f0-9-]{36}$/.test(owner.token)
+      ? owner
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+// A local temporary coordination lock, not a credential or security boundary.
+// Recovery itself is serialized so two processes cannot remove a new owner's
+// directory after simultaneously observing the same dead owner.
+export async function acquireWorkbenchLock({
+  directory = LOCK_DIRECTORY,
+} = {}) {
+  const owner = {
+    tool: LOCK_TOOL,
+    pid: process.pid,
+    token: randomUUID(),
+    createdAt: new Date().toISOString(),
+  };
+  const busy = () =>
+    safeFailure(
+      "ADMIN_BUSY",
+      "同一实例已有本机助手管理操作进行中。请等待完成后，用原 requestId 和原请求重试；不要并行直接调用 Workbench。",
+    );
+  const create = async () => {
+    try {
+      await mkdir(directory, { mode: 0o700 });
+    } catch (error) {
+      if (error.code === "EEXIST") return false;
+      throw error;
+    }
+    try {
+      await writeFile(join(directory, "owner.json"), JSON.stringify(owner), {
+        flag: "wx",
+        mode: 0o600,
+      });
+    } catch (error) {
+      await rmdir(directory).catch(() => {});
+      throw error;
+    }
+    return true;
+  };
+  if (!(await create())) {
+    const recovery = directory + ".recovery";
+    try {
+      await mkdir(recovery, { mode: 0o700 });
+    } catch {
+      throw busy();
+    }
+    try {
+      const previous = await readLockOwner(directory);
+      if (!previous || ownerAlive(previous.pid)) throw busy();
+      // Only this tool's positively identified exited process may be reclaimed.
+      await unlink(join(directory, "owner.json"));
+      await rmdir(directory);
+    } finally {
+      await rmdir(recovery).catch(() => {});
+    }
+    if (!(await create())) throw busy();
+  }
+  return async () => {
+    const current = await readLockOwner(directory);
+    if (!current || current.token !== owner.token || current.pid !== owner.pid)
+      throw busy();
+    await unlink(join(directory, "owner.json"));
+    await rmdir(directory);
+  };
 }
 
 export function executeWorkbench(args) {
@@ -233,7 +335,7 @@ async function prepareRequest(request, inputDirectory) {
 
 // executor is dependency injection for isolated tests. It is never set by CLI,
 // JSON input, environment variables or an assistant-provided command argument.
-export async function runRemoteRequest(
+async function runRemoteRequestUnlocked(
   request,
   { executor = executeWorkbench, inputDirectory = process.cwd() } = {},
 ) {
@@ -349,6 +451,30 @@ export async function runRemoteRequest(
       ...(result.warnings || []),
       "本次临时文件未能全部清理；请让管理员检查，不要把临时内容提交到 Git。",
     ];
+  return result;
+}
+
+export async function runRemoteRequest(request, options = {}) {
+  let release, result;
+  try {
+    // lockDirectory is test injection only; CLI and JSON input cannot set it.
+    release = await acquireWorkbenchLock({ directory: options.lockDirectory });
+    result = await runRemoteRequestUnlocked(request, options);
+  } catch (error) {
+    result = publicFailure(error);
+  } finally {
+    if (release) {
+      try {
+        await release();
+      } catch {
+        if (result)
+          result.warnings = [
+            ...(result.warnings || []),
+            "本机协调锁未能清理；请检查本工具临时锁，再用原请求重试。",
+          ];
+      }
+    }
+  }
   return result;
 }
 
