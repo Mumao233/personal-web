@@ -36,6 +36,10 @@ Node 自动启动仅监听本机随机端口的 Atlas Python 子服务，无需�
 本地 `data/space.sqlite` 保存原个人站的一致性备份，照片在 `data/uploads/`。这些私人数据不会提交 Git。
 新克隆仓库会创建基础内容与新数据库；本地副本保留原管理员和内容。后台操作见 [原需求记录](docs/requirements.md)。邮件/短信需配置用户自己的服务，未配置不代表可送达。
 
+作品、随笔和照片故事支持可视化图文编辑、图片环绕、独立阅读链接，以及分开的草稿和正式发布版本。操作方法见 [图文发布指南](docs/rich-publishing.md)。
+
+问卷支持矩阵量表、选项触发提前结束、排他选择、分布统计与 Excel／CSV 导出；个人资料支持自定义栏目、链接和排序。操作方法见 [问卷与资料栏目](docs/survey-and-profile.md)。
+
 [可后续补充的素材](docs/materials-needed.md)：个人照片、旅行照片与地点、作品说明与截图、指定公开的联系方式。
 
 ## 验证
@@ -52,6 +56,8 @@ npm run build
 ## 仓库与部署
 
 私有仓库：https://github.com/Mumao233/personal-web
+
+线上网站：https://mumao.site/ · [阿里云部署记录](deploy/README.md)
 
 此仓库保存整合网站的完整源码。克隆后按“启动”一节安装依赖并运行；本地私有数据库、上传文件、运行缓存和构建产物不包含在仓库中。
 完整站包含 Node/SQLite 与 Python 服务，不能仅把静态 HTML 上传 GitHub Pages。正式上线需支持这两个服务的主机、HTTPS 及持久数据目录。

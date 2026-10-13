@@ -348,23 +348,20 @@ export default function World({ stories = [], onPick, pick, compact = false }) {
             <X />
           </button>
           {selected.items.map((s) => (
-            <article key={s.id}>
+            <article className="story-entry" key={s.id}>
               <span className="eyebrow">
                 {s.location || s.city} / {date(s.date)}
               </span>
               <h2>{s.title}</h2>
-              <p className="story-body">{s.body}</p>
-              <div className="photo-grid">
-                {(s.photos || []).map((photo, i) => (
-                  <a href={photo} target="_blank" rel="noreferrer" key={i}>
-                    <img
-                      src={photo}
-                      alt={s.title + " · " + (i + 1)}
-                      loading="lazy"
-                    />
-                  </a>
-                ))}
-              </div>
+              <p className="story-body">
+                {s.excerpt || String(s.body || "").slice(0, 120)}
+              </p>
+              <a
+                className="text-link"
+                href={`/?page=world&story=${encodeURIComponent(s.id)}`}
+              >
+                阅读完整故事 <ArrowUpRight />
+              </a>
             </article>
           ))}
         </div>
@@ -373,18 +370,14 @@ export default function World({ stories = [], onPick, pick, compact = false }) {
         <div className="world-stories">
           {stories.length ? (
             stories.map((s) => (
-              <button
+              <a
                 className="story-row"
                 key={s.id}
-                onClick={() => {
-                  setSelected({ ...s, items: [s] });
-                  instance.current?.pointOfView(
-                    { lat: Number(s.lat), lng: Number(s.lng), altitude: 0.5 },
-                    700,
-                  );
-                }}
+                href={`/?page=world&story=${encodeURIComponent(s.id)}`}
               >
-                {s.photos?.[0] && <img src={s.photos[0]} alt="" />}
+                {(s.cover || s.photos?.[0]) && (
+                  <img src={s.cover || s.photos[0]} alt="" loading="lazy" />
+                )}
                 <div>
                   <span className="eyebrow">
                     {s.location} / {date(s.date)}
@@ -392,7 +385,7 @@ export default function World({ stories = [], onPick, pick, compact = false }) {
                   <h3>{s.title}</h3>
                 </div>
                 <ArrowUpRight />
-              </button>
+              </a>
             ))
           ) : (
             <div className="empty">

@@ -1,0 +1,28 @@
+[Unit]
+Description=Personal Universe website and Atlas
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=personal-web
+Group=personal-web
+WorkingDirectory=/opt/personal-web/app
+Environment=NODE_ENV=production
+Environment=HOST=127.0.0.1
+Environment=PORT=5193
+Environment=PYTHON=/usr/bin/python3
+Environment=DATA_DIR=/opt/personal-web/data
+Environment=TRUST_PROXY=1
+ExecStart=/usr/local/bin/node server/index.js --production
+Restart=on-failure
+RestartSec=5
+UMask=0027
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/personal-web/data /opt/personal-web/app/atlas/.runtime
+
+[Install]
+WantedBy=multi-user.target

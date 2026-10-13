@@ -19,15 +19,36 @@ import {
   setting,
   setSetting,
 } from "./store.js";
-import { validateSurvey, validateAnswers } from "./validation.js";
+import {
+  validateSurvey,
+  validateAnswers,
+  surveyFlow,
+  summarizeSurvey,
+  surveyCompletionCounts,
+} from "./validation.js";
 import { notify, deliver, normalizeContact } from "./notifications.js";
 import { startAtlas } from "./atlas-gateway.js";
+import { normalizeProfile, publicProfile } from "./profile.js";
+import {
+  checkRevision,
+  contentRevision,
+  editableContent,
+  publicContent,
+  validatePublication,
+} from "./content.js";
 const app = express();
 const port = Number(process.env.PORT || 5193);
-const atlas = process.env.ATLAS_ENABLED === "0" || (process.env.TEST_MODE && process.env.ATLAS_ENABLED !== "1") ? null : await startAtlas();
+const atlas =
+  process.env.ATLAS_ENABLED === "0" ||
+  (process.env.TEST_MODE && process.env.ATLAS_ENABLED !== "1")
+    ? null
+    : await startAtlas();
 if (process.env.TEST_MODE && atlas) {
   process.stdin.resume();
-  process.stdin.once('end', () => { atlas.stop(); process.exit(0); });
+  process.stdin.once("end", () => {
+    atlas.stop();
+    process.exit(0);
+  });
 }
 if (process.env.TRUST_PROXY === "1") app.set("trust proxy", 1);
 const hash = (s) => createHash("sha256").update(s).digest("hex");
@@ -55,7 +76,9 @@ if (atlas) app.use(atlas.middleware);
 app.use(express.json({ limit: "2mb" }));
 const asyncRoute = (fn) => (req, res, next) =>
   Promise.resolve(fn(req, res, next)).catch(next);
-app.get('/api/health', (req, res) => res.json({ application: 'personal-universe', atlas: Boolean(atlas?.live) }));
+app.get("/api/health", (req, res) =>
+  res.json({ application: "personal-universe", atlas: Boolean(atlas?.live) }),
+);
 const sessions = new Map();
 const rates = new Map();
 function limit(name, max, window) {
@@ -138,10 +161,16 @@ app.post("/api/logout", (req, res) => {
 });
 app.get("/api/public", (req, res) =>
   res.json({
-    profile: setting("profile"),
-    projects: list("projects").filter((x) => x.published),
-    posts: list("posts").filter((x) => x.published),
-    stories: list("stories").filter((x) => x.published),
+    profile: publicProfile(setting("profile")),
+    projects: list("projects")
+      .filter((x) => x.published)
+      .map(publicContent),
+    posts: list("posts")
+      .filter((x) => x.published)
+      .map(publicContent),
+    stories: list("stories")
+      .filter((x) => x.published)
+      .map(publicContent),
     surveys: list("surveys")
       .filter((x) => x.published)
       .map(({ questions, ...s }) => ({
@@ -247,18 +276,25 @@ app.get("/api/surveys/:id", availableSurvey, (req, res) =>
 app.post("/api/surveys/:id/submit", availableSurvey, (req, res, next) => {
   try {
     const answers = validateAnswers(req.survey, req.body.answers || {});
+    const { termination } = surveyFlow(req.survey, answers);
+    const completion = termination ? "terminated" : "completed";
     put("submissions", {
       id: randomUUID(),
       surveyId: req.survey.id,
       answers,
       questions: req.survey.questions,
+      completion,
+      termination,
       createdAt: new Date().toISOString(),
     });
-    res
-      .status(201)
-      .json({
-        message: req.survey.successMessage || "谢谢，你的回答已被保存。",
-      });
+    res.status(201).json({
+      message: termination
+        ? req.survey.terminationMessage ||
+          "感谢参与，你的回答已保存，问卷在此结束。"
+        : req.survey.successMessage || "谢谢，你的回答已被保存。",
+      completion,
+      termination,
+    });
   } catch (e) {
     e.status = 400;
     next(e);
@@ -270,61 +306,17 @@ app.get("/api/surveys/:id/results", (req, res) => {
     return res.status(404).json({ error: "结果未公开" });
   res.json({
     count: list("submissions").filter((x) => x.surveyId === s.id).length,
+    completionCounts: surveyCompletionCounts(
+      list("submissions").filter((x) => x.surveyId === s.id),
+    ),
     summary: summarize(s),
   });
 });
 function summarize(s) {
-  s = {
-    ...s,
-    questions: s.questions.map((q) => ({
-      ...q,
-      options: [
-        ...new Set([...(q.options || []), ...(q.allowOther ? ["其他"] : [])]),
-      ],
-    })),
-  };
-  const rows = list("submissions").filter((x) => x.surveyId === s.id);
-  return s.questions.map((q) => ({
-    id: q.id,
-    title: q.title,
-    type: q.type,
-    counts:
-      q.type === "text"
-        ? null
-        : Object.fromEntries(
-            (q.options || []).map((o) => [
-              o,
-              rows.filter((r) =>
-                Array.isArray(r.answers[q.id])
-                  ? r.answers[q.id].includes(o)
-                  : r.answers[q.id] === o,
-              ).length,
-            ]),
-          ),
-    rank: q.type.includes("rank")
-      ? Object.fromEntries(
-          q.options.map((o) => {
-            const positions = rows
-              .filter(
-                (r) =>
-                  Array.isArray(r.answers[q.id]) && r.answers[q.id].includes(o),
-              )
-              .map((r) => r.answers[q.id].indexOf(o) + 1);
-            return [
-              o,
-              positions.length
-                ? Number(
-                    (
-                      positions.reduce((a, b) => a + b, 0) / positions.length
-                    ).toFixed(2),
-                  )
-                : null,
-            ];
-          }),
-        )
-      : null,
-    answered: rows.filter((r) => r.answers[q.id] != null).length,
-  }));
+  return summarizeSurvey(
+    s,
+    list("submissions").filter((x) => x.surveyId === s.id),
+  );
 }
 app.get(
   "/api/geocode",
@@ -412,13 +404,12 @@ app.get(
   }),
 );
 app.put("/api/admin/profile", (req, res) => {
-  const old = setting("profile");
-  const b = req.body;
-  if (!b.name?.trim()) return res.status(400).json({ error: "名字不能为空" });
-  if (b.github && !/^https?:\/\//.test(b.github))
-    return res.status(400).json({ error: "公开主页链接需要http或https" });
-  setSetting("profile", { ...old, ...b });
-  res.json({ ok: true });
+  try {
+    setSetting("profile", normalizeProfile(setting("profile"), req.body));
+    res.json({ ok: true });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
 });
 app.put("/api/admin/notifications", (req, res) => {
   const old = setting("notifications", {});
@@ -441,25 +432,104 @@ app.post("/api/admin/outbox/:id/retry", (req, res) => {
   void deliver();
   res.json({ ok: true });
 });
+for (const kind of ["projects", "posts", "stories"]) {
+  app.put(`/api/admin/${kind}/:id/draft`, (req, res, next) => {
+    try {
+      const isNew = req.params.id === "new";
+      const old = isNew ? null : get(kind, req.params.id);
+      if (!isNew && !old)
+        return res.status(404).json({ error: "文章不存在，可能已被删除" });
+      checkRevision(old, req.body?.revision);
+      const now = new Date().toISOString();
+      const draft = editableContent(req.body, old?.draft || old || {});
+      const record = {
+        ...(old || {
+          id: randomUUID(),
+          title: "",
+          body: "",
+          published: false,
+          createdAt: now,
+        }),
+        draft,
+        draftSavedAt: now,
+        revision: contentRevision(old) + 1,
+      };
+      // Saving a draft never changes live fields or their last-published time.
+      res.json(put(kind, record));
+    } catch (error) {
+      next(error);
+    }
+  });
+  app.post(`/api/admin/${kind}/:id/publish`, (req, res, next) => {
+    try {
+      const old = get(kind, req.params.id);
+      if (!old) return res.status(404).json({ error: "文章不存在" });
+      checkRevision(old, req.body?.revision);
+      const content = editableContent(old.draft || old);
+      validatePublication(kind, content);
+      const { draft, draftSavedAt, ...live } = old;
+      const now = new Date().toISOString();
+      res.json(
+        put(kind, {
+          ...live,
+          ...content,
+          published: true,
+          publishedAt: old.publishedAt || now,
+          updatedAt: now,
+          revision: contentRevision(old) + 1,
+        }),
+      );
+    } catch (error) {
+      next(error);
+    }
+  });
+  app.post(`/api/admin/${kind}/:id/unpublish`, (req, res, next) => {
+    try {
+      const old = get(kind, req.params.id);
+      if (!old) return res.status(404).json({ error: "文章不存在" });
+      checkRevision(old, req.body?.revision);
+      res.json(
+        put(kind, {
+          ...old,
+          published: false,
+          revision: contentRevision(old) + 1,
+          updatedAt: new Date().toISOString(),
+        }),
+      );
+    } catch (error) {
+      next(error);
+    }
+  });
+}
 for (const kind of ["projects", "posts", "stories", "surveys"]) {
   app.put(`/api/admin/${kind}/:id`, (req, res, next) => {
     try {
       const b = req.body;
       const id = req.params.id === "new" ? randomUUID() : req.params.id;
-      if (kind === "surveys") validateSurvey(b);
-      else if (!b.title?.trim()) throw Error("标题不能为空");
-      if (
-        kind === "stories" &&
-        (!Number.isFinite(Number(b.lat)) ||
-          Number(b.lat) < -90 ||
-          Number(b.lat) > 90 ||
-          !Number.isFinite(Number(b.lng)) ||
-          Number(b.lng) < -180 ||
-          Number(b.lng) > 180)
-      )
-        throw Error("地点坐标无效");
-      if (kind === "projects" && b.link && !/^https?:\/\//.test(b.link))
-        throw Error("项目链接需要http或https");
+      const old = get(kind, id);
+      if (kind !== "surveys") {
+        if (b.revision !== undefined) checkRevision(old, b.revision);
+        const content = editableContent(b, old || {});
+        validatePublication(kind, content, {
+          requireLocationConfirmation: false,
+        });
+        const { draft, draftSavedAt, ...previous } = old || {};
+        return res.json(
+          put(kind, {
+            ...previous,
+            ...content,
+            id,
+            published:
+              typeof b.published === "boolean"
+                ? b.published
+                : Boolean(old?.published),
+            revision: contentRevision(old) + 1,
+            createdAt: old?.createdAt || new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          }),
+        );
+      }
+      validateSurvey(b);
       res.json(
         put(kind, {
           ...b,
@@ -469,7 +539,7 @@ for (const kind of ["projects", "posts", "stories", "surveys"]) {
         }),
       );
     } catch (e) {
-      e.status = 400;
+      e.status ||= 400;
       next(e);
     }
   });
@@ -510,6 +580,9 @@ app.get("/api/admin/surveys/:id/results", (req, res) => {
   if (!s) return res.status(404).json({ error: "问卷不存在" });
   res.json({
     rows: list("submissions").filter((x) => x.surveyId === s.id),
+    completionCounts: surveyCompletionCounts(
+      list("submissions").filter((x) => x.surveyId === s.id),
+    ),
     summary: summarize(s),
   });
 });
@@ -518,34 +591,71 @@ app.get(
   asyncRoute(async (req, res) => {
     const s = get("surveys", req.params.id);
     if (!s) return res.status(404).json({ error: "问卷不存在" });
-    const rows = list("submissions").filter((x) => x.surveyId === s.id);
-    const questions = [
-      ...new Map(
-        [...s.questions, ...rows.flatMap((r) => r.questions || [])].map((q) => [
-          q.id,
-          q,
-        ]),
-      ).values(),
+    const rows = list("submissions").filter(
+      (row) =>
+        row.surveyId === s.id &&
+        (!["completed", "terminated"].includes(req.query.completion) ||
+          (row.completion === "terminated" ? "terminated" : "completed") ===
+            req.query.completion),
+    );
+    // Union current definitions with every saved snapshot: removing a matrix row
+    // or changing a question later must not erase historical export columns.
+    const columns = new Map();
+    for (const question of [
+      ...s.questions,
+      ...rows.flatMap((row) => row.questions || []),
+    ]) {
+      const entries =
+        question.type === "matrix"
+          ? (question.rows || []).map((matrixRow) => ({
+              questionId: question.id,
+              rowId: matrixRow.id,
+              title: `${question.title} · ${matrixRow.title}`,
+            }))
+          : [{ questionId: question.id, rowId: null, title: question.title }];
+      for (const entry of entries) {
+        const key = JSON.stringify([entry.questionId, entry.rowId]);
+        if (!columns.has(key)) columns.set(key, entry);
+      }
+    }
+    const exportColumns = [...columns.values()];
+    const headers = [
+      "提交编号",
+      "时间",
+      "完成状态",
+      "结束题目",
+      "结束选项",
+      ...exportColumns.map((column) => column.title),
     ];
-    const headers = ["提交编号", "时间", ...questions.map((q) => q.title)];
     const values = rows.map((r) => [
       r.id,
       r.createdAt,
-      ...questions.map(
-        (q) =>
-          (Array.isArray(r.answers[q.id])
-            ? r.answers[q.id].join(" → ")
-            : r.answers[q.id] || "") +
-          (r.answers[q.id + "__other"]
-            ? " [其他：" + r.answers[q.id + "__other"] + "]"
-            : ""),
-      ),
+      r.completion === "terminated" ? "提前结束" : "完整完成",
+      r.termination?.questionTitle || "",
+      r.termination?.option || "",
+      ...exportColumns.map((column) => {
+        const answer = r.answers[column.questionId];
+        if (column.rowId !== null)
+          return answer && typeof answer === "object" && !Array.isArray(answer)
+            ? answer[column.rowId] || ""
+            : "";
+        return (
+          (Array.isArray(answer)
+            ? answer.join(" → ")
+            : typeof answer === "string"
+              ? answer
+              : "") +
+          (r.answers[column.questionId + "__other"]
+            ? " [其他：" + r.answers[column.questionId + "__other"] + "]"
+            : "")
+        );
+      }),
     ]);
     if (req.query.format === "csv") {
       const escape = (v) =>
         '"' +
         String(v)
-          .replace(/^[=+@-]/, "'$&")
+          .replace(/^\s*[=+@-]/, "'$&")
           .replaceAll('"', '""') +
         '"';
       res
@@ -605,7 +715,8 @@ app.use(
 if (process.argv.includes("--production")) {
   app.use(express.static(resolve("dist")));
   app.get("/{*path}", (req, res) => {
-    if (req.path.startsWith('/api/') || /\.[a-z0-9]+$/i.test(req.path)) return res.status(404).json({ error: "页面或文件不存在" });
+    if (req.path.startsWith("/api/") || /\.[a-z0-9]+$/i.test(req.path))
+      return res.status(404).json({ error: "页面或文件不存在" });
     res.sendFile(resolve("dist/index.html"));
   });
 } else {
@@ -617,18 +728,15 @@ if (process.argv.includes("--production")) {
   app.use(vite.middlewares);
 }
 app.use((err, req, res, next) => {
-  res
-    .status(err.status || 500)
-    .json({
-      error:
-        err.status === 400
-          ? err.message
-          : err.code === "LIMIT_FILE_SIZE"
-            ? "文件超过15MB"
-            : err.status === 401
-              ? "请登录"
-              : "操作失败，请检查输入或稍后重试",
-    });
+  res.status(err.status || 500).json({
+    error: [400, 409, 404].includes(err.status)
+      ? err.message
+      : err.code === "LIMIT_FILE_SIZE"
+        ? "文件超过15MB"
+        : err.status === 401
+          ? "请登录"
+          : "操作失败，请检查输入或稍后重试",
+  });
   if (!process.env.TEST_MODE) console.error(err.message);
 });
 app.listen(port, process.env.HOST || "127.0.0.1", () =>

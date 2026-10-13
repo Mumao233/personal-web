@@ -17,6 +17,8 @@ import {
 import { api, date } from "./api";
 import { quotes } from "./quotes";
 import Survey from "./survey";
+import ArticleContent from "./article-content";
+import { ProfileFields } from "./profile-fields";
 import "./style.css";
 import "./space.css";
 const Admin = lazy(() => import("./admin"));
@@ -158,7 +160,11 @@ function App() {
     [error, setError] = useState(""),
     [menu, setMenu] = useState(false);
   const query = new URLSearchParams(location.search);
-  const page = query.get("page") || "home";
+  const detailKind = ["post", "project", "story"].find((key) => query.has(key));
+  const detailPage = { post: "notes", project: "projects", story: "world" }[
+    detailKind
+  ];
+  const page = query.get("page") || detailPage || "home";
   const load = () =>
     api("/public")
       .then(setData)
@@ -180,11 +186,11 @@ function App() {
       </div>
     );
   const p = data.profile;
-  const detail = query.get("post")
-    ? data.posts.find((x) => x.id === query.get("post"))
-    : query.get("project")
-      ? data.projects.find((x) => x.id === query.get("project"))
-      : null;
+  const detail = detailKind
+    ? data[
+        { post: "posts", project: "projects", story: "stories" }[detailKind]
+      ].find((item) => item.id === query.get(detailKind))
+    : null;
   return (
     <>
       <Intro />
@@ -192,13 +198,15 @@ function App() {
         <Space
           home={
             page === "home" &&
-            !detail &&
+            !detailKind &&
             !query.has("answer") &&
             !query.has("survey")
           }
         />
       </Suspense>
-      <div className={`site-content ${page === "home" ? "is-home" : ""}`}>
+      <div
+        className={`site-content ${page === "home" && !detailKind ? "is-home" : ""}`}
+      >
         <header className="header">
           <a className="wordmark" href="/">
             {p.name}
@@ -229,37 +237,23 @@ function App() {
             <Answer token={query.get("answer")} />
           ) : query.has("survey") ? (
             <Survey id={query.get("survey")} />
-          ) : detail ? (
-            <article className="reading">
-              <a
-                className="back"
-                href={"/?page=" + (query.has("post") ? "notes" : "projects")}
-              >
-                <ArrowLeft /> 返回
+          ) : detailKind ? (
+            <div className="reading article-reading">
+              <a className="back" href={"/?page=" + detailPage}>
+                <ArrowLeft /> 返回{nav.find(([key]) => key === detailPage)?.[1]}
               </a>
-              <span className="eyebrow">
-                {detail.category || date(detail.createdAt)}
-              </span>
-              <h1>{detail.title}</h1>
-              {detail.cover && (
-                <img
-                  className="article-cover"
-                  src={detail.cover}
-                  alt={detail.title}
-                />
+              {detail ? (
+                <ArticleContent item={detail} />
+              ) : (
+                <section className="article-not-found">
+                  <span className="eyebrow">ARTICLE NOT FOUND</span>
+                  <h1>这篇内容暂时不在这里。</h1>
+                  <p>
+                    可能尚未发布、已被移除，或链接不完整。可以返回列表看看其他记录。
+                  </p>
+                </section>
               )}
-              <Text>{detail.body}</Text>
-              {detail.link && (
-                <a
-                  className="text-link"
-                  href={detail.link}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  查看项目 <ArrowUpRight />
-                </a>
-              )}
-            </article>
+            </div>
           ) : (
             <>
               {page === "home" && (
@@ -617,35 +611,8 @@ export function PageHead({ label, title, subtitle }) {
 function Contact({ p }) {
   return (
     <div className="contact">
-      <span className="eyebrow">SAY HELLO</span>
-      {p.email && (
-        <a href={"mailto:" + p.email}>
-          <Envelope />
-          {p.email}
-        </a>
-      )}
-      {p.phone && (
-        <a href={"tel:" + p.phone}>
-          <Phone />
-          {p.phone}
-        </a>
-      )}
-      {p.wechat && (
-        <span>
-          <WeChatLogo />
-          {p.wechat}
-        </span>
-      )}
-      {p.github && (
-        <a href={p.github} target="_blank" rel="noreferrer">
-          GitHub <ArrowUpRight />
-        </a>
-      )}
-      {!p.email && !p.phone && !p.wechat && (
-        <a href="/?page=us">
-          给我留一句话 <ArrowUpRight />
-        </a>
-      )}
+      <span className="eyebrow">PROFILE / 个人资料</span>
+      <ProfileFields profile={p} />
     </div>
   );
 }

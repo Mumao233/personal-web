@@ -1,0 +1,79 @@
+.profile-fields-editor {
+  display: grid;
+  gap: 16px;
+}
+.profile-fields-editor h2 {
+  margin: 0 0 10px;
+}
+.profile-field-editor {
+  border: 1px solid #393329;
+  border-radius: 8px;
+  padding: 18px;
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+.profile-field-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+.profile-field-head > div {
+  display: flex;
+  gap: 5px;
+}
+.profile-field-head button {
+  padding: 7px;
+}
+.profile-field-inputs {
+  display: grid;
+  grid-template-columns: minmax(110px, 0.7fr) minmax(180px, 1.2fr) minmax(
+      180px,
+      1.2fr
+    );
+  gap: 14px;
+}
+.profile-field-editor .fine {
+  margin: -6px 0 0;
+}
+.profile-field-editor label {
+  min-width: 0;
+}
+.profile-public-fields {
+  margin: 28px 0 0;
+  display: grid;
+  gap: 0;
+  font-size: 14px;
+}
+.profile-public-fields > div {
+  padding: 15px 0;
+  border-bottom: 1px solid #ffffff13;
+}
+.profile-public-fields dt {
+  color: #b6a58e;
+  font-size: 12px;
+  margin-bottom: 7px;
+}
+.profile-public-fields dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  line-height: 1.65;
+}
+.profile-public-fields a {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+}
+.profile-public-fields a:hover {
+  color: #eac591;
+}
+.profile-public-fields a svg {
+  flex: 0 0 15px;
+}
+@media (max-width: 900px) {
+  .profile-field-inputs {
+    grid-template-columns: 1fr;
+  }
+}

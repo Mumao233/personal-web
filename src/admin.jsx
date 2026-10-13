@@ -1,4 +1,4 @@
-import React, { useEffect, useState, lazy, Suspense } from "react";
+import React, { useEffect, useState, useRef, lazy, Suspense } from "react";
 import {
   ArrowLeft,
   ArrowRight,
@@ -16,6 +16,17 @@ import {
 } from "@phosphor-icons/react";
 import { api, date } from "./api";
 import Survey from "./survey";
+import RichEditor from "./rich-editor";
+import ArticleContent from "./article-content";
+import useDraftPublishing from "./use-draft-publishing";
+import { ProfileFieldsEditor } from "./profile-fields";
+import {
+  exclusiveOptionsFor,
+  summarizeSurvey,
+  surveyCompletionCounts,
+} from "../server/validation.js";
+import "./publishing.css";
+import "./survey-admin.css";
 const World = lazy(() => import("./world"));
 const labels = {
   profile: "个人资料",
@@ -55,6 +66,7 @@ const newContent = (kind) => ({
   closed: false,
   publicResults: false,
   successMessage: "谢谢，你的回答已被保存。",
+  terminationMessage: "感谢你的参与，本次问卷到这里结束。",
   startsAt: "",
   endsAt: "",
 });
@@ -69,7 +81,71 @@ const newQuestion = () => ({
   min: 0,
   max: 0,
   condition: null,
+  rows: [],
+  terminateOptions: [],
+  exclusiveOptions: [],
 });
+const likertOptions = [
+  "非常不同意",
+  "比较不同意",
+  "既不赞同也不反对",
+  "比较同意",
+  "非常同意",
+];
+const choiceTypes = ["single", "multiple", "rank", "multirank"];
+const terminatingTypes = ["single", "multiple", "multirank"];
+const exclusiveTypes = ["multiple", "multirank"];
+const questionOptions = (question) => [
+  ...new Set([
+    ...(question.options || []).filter((option) => option.trim()),
+    ...(question.allowOther ? ["其他"] : []),
+  ]),
+];
+function cleanQuestionRules(questions) {
+  return questions.map((question, index) => {
+    const options = questionOptions(question);
+    const source = questions
+      .slice(0, index)
+      .find((candidate) => candidate.id === question.condition?.questionId);
+    const conditionValid =
+      source &&
+      choiceTypes.includes(source.type) &&
+      (!question.condition.value ||
+        questionOptions(source).includes(question.condition.value));
+    return {
+      ...question,
+      terminateOptions: terminatingTypes.includes(question.type)
+        ? (question.terminateOptions || []).filter((option) =>
+            options.includes(option),
+          )
+        : [],
+      exclusiveOptions: exclusiveTypes.includes(question.type)
+        ? (question.exclusiveOptions || []).filter((option) =>
+            options.includes(option),
+          )
+        : [],
+      condition:
+        question.condition && conditionValid ? question.condition : null,
+    };
+  });
+}
+function newMatrixQuestion(example = false) {
+  const statements = example
+    ? [
+        "我感到自己可支配的生活资金比较紧张。",
+        "我担心自己的资金不足以支付日常开销。",
+        "我难以负担一些对自己重要的消费。",
+        "我希望通过兼职或其他方式，增加自己可支配的生活费。",
+      ]
+    : ["", ""];
+  return {
+    ...newQuestion(),
+    type: "matrix",
+    title: example ? "请根据你的实际情况，选择对以下陈述的认同程度。" : "",
+    options: [...likertOptions],
+    rows: statements.map((title) => ({ id: crypto.randomUUID(), title })),
+  };
+}
 function Field({ label, value, onChange, type = "text", ...props }) {
   return (
     <label>
@@ -108,6 +184,7 @@ function Toggle({ label, value, onChange }) {
   );
 }
 export default function Admin() {
+  const leaveEditor = useRef(null);
   const [state, setState] = useState(null),
     [setup, setSetup] = useState(false),
     [login, setLogin] = useState({ username: "", password: "" }),
@@ -202,7 +279,15 @@ export default function Admin() {
   return (
     <div className="admin-shell">
       <aside className="admin-sidebar">
-        <a className="wordmark" href="/">
+        <a
+          className="wordmark"
+          href="/"
+          onClick={async (e) => {
+            if (!leaveEditor.current) return;
+            e.preventDefault();
+            if (await leaveEditor.current()) window.location.assign("/");
+          }}
+        >
           林珈诚<span>YOUR PERSONAL SPACE</span>
         </a>
         <span className="eyebrow">管理空间</span>
@@ -211,10 +296,13 @@ export default function Admin() {
             <button
               key={k}
               className={tab === k ? "active" : ""}
-              onClick={() => {
+              onClick={async () => {
+                if (leaveEditor.current && !(await leaveEditor.current()))
+                  return;
                 setTab(k);
                 setEditor(null);
                 setError("");
+                load();
               }}
             >
               {v}
@@ -229,9 +317,10 @@ export default function Admin() {
         </a>
         <button
           className="quiet"
-          onClick={() =>
-            attempt(() => api("/logout", { method: "POST" }), "已退出")
-          }
+          onClick={async () => {
+            if (leaveEditor.current && !(await leaveEditor.current())) return;
+            await attempt(() => api("/logout", { method: "POST" }), "已退出");
+          }}
         >
           <SignOut /> 退出
         </button>
@@ -279,7 +368,11 @@ export default function Admin() {
               kind={tab}
               item={editor}
               busy={busy}
-              close={() => setEditor(null)}
+              leaveEditor={leaveEditor}
+              close={() => {
+                setEditor(null);
+                load();
+              }}
               save={async (b) => {
                 if (
                   await attempt(() =>
@@ -299,11 +392,17 @@ export default function Admin() {
                   <div className="admin-list-row" key={x.id}>
                     <div>
                       <span className="eyebrow">
-                        {x.published ? "已发布" : "草稿"}
+                        {x.published
+                          ? x.draft
+                            ? "已发布 · 有未发布修改"
+                            : "已发布"
+                          : "草稿"}
                         {x.closed ? " · 已关闭" : ""}
                       </span>
-                      <h3>{x.title}</h3>
-                      <p>{date(x.updatedAt || x.createdAt)}</p>
+                      <h3>{x.draft?.title || x.title || "未命名草稿"}</h3>
+                      <p>
+                        {date(x.draftSavedAt || x.updatedAt || x.createdAt)}
+                      </p>
                     </div>
                     <div className="row-actions">
                       <button onClick={() => setEditor(x)}>编辑</button>
@@ -375,36 +474,7 @@ function Profile({ data, save, busy }) {
         save(b);
       }}
     >
-      <div className="field-grid">
-        <Field
-          label="名字"
-          value={b.name}
-          onChange={(v) => set("name", v)}
-          required
-        />
-        <Field
-          label="公开邮箱"
-          value={b.email}
-          type="email"
-          onChange={(v) => set("email", v)}
-        />
-        <Field
-          label="公开手机号"
-          value={b.phone}
-          onChange={(v) => set("phone", v)}
-        />
-        <Field
-          label="公开微信号"
-          value={b.wechat}
-          onChange={(v) => set("wechat", v)}
-        />
-        <Field
-          label="GitHub / 公开主页链接"
-          value={b.github}
-          type="url"
-          onChange={(v) => set("github", v)}
-        />
-      </div>
+      <ProfileFieldsEditor profile={b} onChange={setB} />
       <Field
         label="首页短介绍"
         type="textarea"
@@ -550,22 +620,125 @@ function Profile({ data, save, busy }) {
     </form>
   );
 }
-function ContentEditor({ kind, item, save, close, busy }) {
-  const [b, setB] = useState(item),
+function ContentEditor({ kind, item, save, close, busy, leaveEditor }) {
+  const [b, setB] = useState(() => ({
+      ...newContent(kind),
+      ...(item.id !== "new" ? { date: "" } : {}),
+      ...item,
+      ...item.draft,
+    })),
     [preview, setPreview] = useState(false),
     [uploading, setUploading] = useState(false),
+    [inlineUploading, setInlineUploading] = useState(false),
+    [previewSize, setPreviewSize] = useState("desktop"),
     [error, setError] = useState(""),
     [places, setPlaces] = useState([]),
     [query, setQuery] = useState(""),
     [gpsFound, setGpsFound] = useState(false);
-  const set = (k, v) => setB((prev) => ({ ...prev, [k]: v }));
+  const publisher = useDraftPublishing(
+    kind,
+    item,
+    b,
+    uploading || inlineUploading,
+  );
+  useEffect(() => {
+    if (kind === "surveys") return;
+    leaveEditor.current = publisher.leave;
+    return () => {
+      leaveEditor.current = null;
+    };
+  });
+  async function goBack() {
+    if (kind === "surveys" || (await publisher.leave())) close();
+  }
+  const set = (k, v) =>
+    setB((prev) => ({
+      ...prev,
+      [k]: k === "questions" ? cleanQuestionRules(v) : v,
+    }));
   const updateQ = (i, key, v) =>
     setB((prev) => ({
       ...prev,
-      questions: prev.questions.map((q, j) =>
-        i === j ? { ...q, [key]: v } : q,
+      questions: cleanQuestionRules(
+        prev.questions.map((q, j) => (i === j ? { ...q, [key]: v } : q)),
       ),
     }));
+  function changeQuestionType(index, type) {
+    setB((prev) => ({
+      ...prev,
+      questions: cleanQuestionRules(
+        prev.questions.map((question, i) => {
+          if (i !== index || question.type === type) return question;
+          return {
+            ...question,
+            type,
+            options:
+              type === "matrix"
+                ? [...likertOptions]
+                : question.type === "text"
+                  ? ["选项一", "选项二"]
+                  : question.options,
+            rows:
+              type === "matrix"
+                ? question.rows?.length
+                  ? question.rows
+                  : newMatrixQuestion().rows
+                : [],
+            allowOther: terminatingTypes.includes(type)
+              ? !!question.allowOther
+              : false,
+            min: exclusiveTypes.includes(type) ? question.min || 0 : 0,
+            max: exclusiveTypes.includes(type) ? question.max || 0 : 0,
+          };
+        }),
+      ),
+    }));
+  }
+  function toggleOptionRule(index, key, option, checked) {
+    setB((prev) => ({
+      ...prev,
+      questions: cleanQuestionRules(
+        prev.questions.map((question, i) =>
+          i !== index
+            ? question
+            : {
+                ...question,
+                [key]: checked
+                  ? [...new Set([...(question[key] || []), option])]
+                  : (question[key] || []).filter((value) => value !== option),
+              },
+        ),
+      ),
+    }));
+  }
+  function addExclusiveNone(index) {
+    setB((prev) => ({
+      ...prev,
+      questions: cleanQuestionRules(
+        prev.questions.map((question, i) =>
+          i !== index
+            ? question
+            : {
+                ...question,
+                options: questionOptions(question).includes("以上都无")
+                  ? question.options
+                  : [
+                      ...(question.options || []).filter((option) =>
+                        option.trim(),
+                      ),
+                      "以上都无",
+                    ],
+                exclusiveOptions: [
+                  ...new Set([
+                    ...(question.exclusiveOptions || []),
+                    "以上都无",
+                  ]),
+                ],
+              },
+        ),
+      ),
+    }));
+  }
   useEffect(() => {
     if (kind !== "stories" || !gpsFound) return;
     let active = true;
@@ -643,13 +816,17 @@ function ContentEditor({ kind, item, save, close, busy }) {
   if (item.showResults) return <Results survey={item} close={close} />;
   return (
     <>
-      <button className="back" onClick={close}>
+      <button className="back" onClick={goBack}>
         <ArrowLeft /> 返回列表
       </button>
       <form
         className="editor-form"
         onSubmit={(e) => {
           e.preventDefault();
+          if (kind !== "surveys") {
+            publisher.publish();
+            return;
+          }
           if (kind === "stories" && b.published && !b.confirmLocation) {
             setError("请确认照片的精确位置后再发布");
             return;
@@ -667,438 +844,772 @@ function ContentEditor({ kind, item, save, close, busy }) {
           );
         }}
       >
-        <Field
-          label="标题"
-          value={b.title}
-          onChange={(v) => set("title", v)}
-          required
-        />
-        {kind === "surveys" ? (
-          <>
-            <Field
-              label="问卷说明"
-              type="textarea"
-              rows={3}
-              value={b.description}
-              onChange={(v) => set("description", v)}
-            />
-            <div className="field-grid">
+        <div
+          className="editor-fields"
+          inert={publisher.action ? true : undefined}
+        >
+          <Field
+            label="标题"
+            value={b.title}
+            onChange={(v) => set("title", v)}
+            required
+          />
+          {kind === "surveys" ? (
+            <>
               <Field
-                label="开始时间（可留空）"
-                type="datetime-local"
-                value={localTime(b.startsAt)}
-                onChange={(v) => set("startsAt", v)}
+                label="问卷说明"
+                type="textarea"
+                rows={3}
+                value={b.description}
+                onChange={(v) => set("description", v)}
               />
-              <Field
-                label="截止时间（可留空）"
-                type="datetime-local"
-                value={localTime(b.endsAt)}
-                onChange={(v) => set("endsAt", v)}
-              />
-            </div>
-            <div className="form-options">
-              <Toggle
-                label="关闭问卷"
-                value={b.closed}
-                onChange={(v) => set("closed", v)}
-              />
-              <Toggle
-                label="提交后显示汇总结果（不公开文字回答）"
-                value={b.publicResults}
-                onChange={(v) => set("publicResults", v)}
-              />
-            </div>
-            <Field
-              label="提交成功提示"
-              value={b.successMessage}
-              onChange={(v) => set("successMessage", v)}
-            />
-            <h2>题目编辑</h2>
-            <p className="fine">
-              按顺序展示；同名章节连续分组。条件题只在指定的前置答案出现时显示，其他答案自动跳过。
-            </p>
-            {b.questions.map((q, i) => (
-              <section className="question-editor" key={q.id}>
-                <div className="question-editor-head">
-                  <span className="eyebrow">QUESTION {i + 1}</span>
-                  <div>
-                    <button
-                      type="button"
-                      disabled={!i}
-                      aria-label="上移题目"
-                      onClick={() => {
-                        const a = [...b.questions];
-                        [a[i - 1], a[i]] = [a[i], a[i - 1]];
-                        set("questions", a);
-                      }}
-                    >
-                      <ArrowUp />
-                    </button>
-                    <button
-                      type="button"
-                      disabled={i === b.questions.length - 1}
-                      aria-label="下移题目"
-                      onClick={() => {
-                        const a = [...b.questions];
-                        [a[i + 1], a[i]] = [a[i], a[i + 1]];
-                        set("questions", a);
-                      }}
-                    >
-                      <ArrowDown />
-                    </button>
-                    <button
-                      type="button"
-                      className="danger"
-                      aria-label="删除题目"
-                      onClick={() =>
-                        set(
-                          "questions",
-                          b.questions.filter((_, j) => j !== i),
-                        )
-                      }
-                    >
-                      <Trash />
-                    </button>
-                  </div>
-                </div>
-                <div className="field-grid">
-                  <Field
-                    label="题目"
-                    value={q.title}
-                    onChange={(v) => updateQ(i, "title", v)}
-                    required
-                  />
-                  <label>
-                    题型
-                    <select
-                      value={q.type}
-                      onChange={(e) => updateQ(i, "type", e.target.value)}
-                    >
-                      {[
-                        ["single", "单选"],
-                        ["multiple", "多选"],
-                        ["rank", "全部排序"],
-                        ["multirank", "多选后排序"],
-                        ["text", "文字回答"],
-                      ].map(([k, l]) => (
-                        <option value={k} key={k}>
-                          {l}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                </div>
+              <div className="field-grid">
                 <Field
-                  label="补充说明"
-                  value={q.description}
-                  onChange={(v) => updateQ(i, "description", v)}
+                  label="开始时间（可留空）"
+                  type="datetime-local"
+                  value={localTime(b.startsAt)}
+                  onChange={(v) => set("startsAt", v)}
                 />
-                {q.type !== "text" && (
-                  <Field
-                    label="选项（每行一个）"
-                    type="textarea"
-                    rows={4}
-                    value={q.options.join("\n")}
-                    onChange={(v) => updateQ(i, "options", v.split("\n"))}
-                  />
-                )}
-                <div className="field-grid">
-                  <Field
-                    label="所属章节（留空为“问题”）"
-                    value={q.section}
-                    onChange={(v) => updateQ(i, "section", v)}
-                  />
-                  {["multiple", "multirank"].includes(q.type) && (
-                    <>
-                      <Field
-                        label="最少选择（0为不限）"
-                        type="number"
-                        min="0"
-                        value={q.min}
-                        onChange={(v) => updateQ(i, "min", v)}
-                      />
-                      <Field
-                        label="最多选择（0为不限）"
-                        type="number"
-                        min="0"
-                        value={q.max}
-                        onChange={(v) => updateQ(i, "max", v)}
-                      />
-                    </>
-                  )}
-                </div>
+                <Field
+                  label="截止时间（可留空）"
+                  type="datetime-local"
+                  value={localTime(b.endsAt)}
+                  onChange={(v) => set("endsAt", v)}
+                />
+              </div>
+              <div className="form-options">
                 <Toggle
-                  label="必答"
-                  value={q.required}
-                  onChange={(v) => updateQ(i, "required", v)}
+                  label="关闭问卷"
+                  value={b.closed}
+                  onChange={(v) => set("closed", v)}
                 />
-                {["single", "multiple", "multirank"].includes(q.type) && (
-                  <Toggle
-                    label="允许选择“其他”并补充文字"
-                    value={q.allowOther}
-                    onChange={(v) => updateQ(i, "allowOther", v)}
-                  />
-                )}
-                <details>
-                  <summary>条件显示 / 自动跳题</summary>
-                  <label>
-                    当之前的哪一题
-                    <select
-                      value={q.condition?.questionId || ""}
-                      onChange={(e) =>
-                        updateQ(
-                          i,
-                          "condition",
-                          e.target.value
-                            ? { questionId: e.target.value, value: "" }
-                            : null,
-                        )
-                      }
-                    >
-                      <option value="">始终显示</option>
-                      {b.questions
-                        .slice(0, i)
-                        .filter((x) => x.type !== "text")
-                        .map((x) => (
-                          <option key={x.id} value={x.id}>
-                            {x.title || "未命名题目"}
-                          </option>
-                        ))}
-                    </select>
-                  </label>
-                  {q.condition?.questionId && (
-                    <label>
-                      选中以下答案时，才显示本题
-                      <select
-                        value={q.condition.value}
-                        onChange={(e) =>
-                          updateQ(i, "condition", {
-                            ...q.condition,
-                            value: e.target.value,
-                          })
+                <Toggle
+                  label="提交后显示汇总结果（不公开文字回答）"
+                  value={b.publicResults}
+                  onChange={(v) => set("publicResults", v)}
+                />
+              </div>
+              <Field
+                label="提交成功提示"
+                value={b.successMessage}
+                onChange={(v) => set("successMessage", v)}
+              />
+              <Field
+                label="提前结束提示"
+                value={b.terminationMessage}
+                onChange={(v) => set("terminationMessage", v)}
+                placeholder="感谢你的参与，本次问卷到这里结束。"
+              />
+              <h2>题目编辑</h2>
+              <p className="fine">
+                按顺序展示；同名章节连续分组。可为选项设置提前结束或排他规则，矩阵题每行单选。
+              </p>
+              {b.questions.map((q, i) => (
+                <section className="question-editor" key={q.id}>
+                  <div className="question-editor-head">
+                    <span className="eyebrow">QUESTION {i + 1}</span>
+                    <div>
+                      <button
+                        type="button"
+                        disabled={!i}
+                        aria-label="上移题目"
+                        onClick={() => {
+                          const a = [...b.questions];
+                          [a[i - 1], a[i]] = [a[i], a[i - 1]];
+                          set("questions", a);
+                        }}
+                      >
+                        <ArrowUp />
+                      </button>
+                      <button
+                        type="button"
+                        disabled={i === b.questions.length - 1}
+                        aria-label="下移题目"
+                        onClick={() => {
+                          const a = [...b.questions];
+                          [a[i + 1], a[i]] = [a[i], a[i + 1]];
+                          set("questions", a);
+                        }}
+                      >
+                        <ArrowDown />
+                      </button>
+                      <button
+                        type="button"
+                        className="danger"
+                        aria-label="删除题目"
+                        onClick={() =>
+                          set(
+                            "questions",
+                            b.questions.filter((_, j) => j !== i),
+                          )
                         }
                       >
-                        <option value="">选择一个答案</option>
-                        {(
-                          b.questions.find(
-                            (x) => x.id === q.condition.questionId,
-                          )?.options || []
-                        ).map((o) => (
-                          <option value={o} key={o}>
-                            {o}
+                        <Trash />
+                      </button>
+                    </div>
+                  </div>
+                  <div className="field-grid">
+                    <Field
+                      label="题目"
+                      value={q.title}
+                      onChange={(v) => updateQ(i, "title", v)}
+                      required
+                    />
+                    <label>
+                      题型
+                      <select
+                        value={q.type}
+                        onChange={(e) => changeQuestionType(i, e.target.value)}
+                      >
+                        {[
+                          ["single", "单选"],
+                          ["multiple", "多选"],
+                          ["rank", "全部排序"],
+                          ["multirank", "多选后排序"],
+                          ["matrix", "矩阵量表（每行单选）"],
+                          ["text", "文字回答"],
+                        ].map(([k, l]) => (
+                          <option value={k} key={k}>
+                            {l}
                           </option>
                         ))}
                       </select>
                     </label>
+                  </div>
+                  <Field
+                    label="补充说明"
+                    value={q.description}
+                    onChange={(v) => updateQ(i, "description", v)}
+                  />
+                  {q.type !== "text" && (
+                    <Field
+                      label={
+                        q.type === "matrix"
+                          ? "矩阵列选项（每行一个，从左到右）"
+                          : "选项（每行一个）"
+                      }
+                      type="textarea"
+                      rows={4}
+                      value={(q.options || []).join("\n")}
+                      onChange={(v) => updateQ(i, "options", v.split("\n"))}
+                    />
                   )}
-                </details>
-              </section>
-            ))}
-            <button
-              type="button"
-              className="quiet"
-              onClick={() => set("questions", [...b.questions, newQuestion()])}
-            >
-              <Plus /> 添加题目
-            </button>
-            <button
-              type="button"
-              className="quiet"
-              onClick={() => setPreview(!preview)}
-            >
-              <Eye />
-              {preview ? "关闭预览" : "预览问卷"}
-            </button>
-            {preview && <Survey key={JSON.stringify(b)} preview={b} />}
-          </>
-        ) : (
-          <>
-            <Field
-              label={kind === "stories" ? "照片故事" : "正文（空行分段）"}
-              type="textarea"
-              rows={12}
-              value={b.body}
-              onChange={(v) => set("body", v)}
-            />
-            {kind === "projects" && (
-              <div className="field-grid">
-                <Field
-                  label="分类"
-                  value={b.category}
-                  onChange={(v) => set("category", v)}
-                />
-                <Field
-                  label="进度状态"
-                  value={b.status}
-                  onChange={(v) => set("status", v)}
-                />
-                <Field
-                  label="项目链接"
-                  type="url"
-                  value={b.link}
-                  onChange={(v) => set("link", v)}
-                />
-              </div>
-            )}
-            {kind === "posts" && (
-              <Field
-                label="列表摘要"
-                value={b.excerpt}
-                onChange={(v) => set("excerpt", v)}
-              />
-            )}
-            <label>
-              {kind === "stories"
-                ? "上传照片（最多20张，每张15MB）"
-                : "上传封面"}
-              <input
-                type="file"
-                accept="image/jpeg,image/png,image/webp,image/gif"
-                multiple={kind === "stories"}
-                disabled={uploading}
-                onChange={upload}
-              />
-            </label>
-            {uploading && <p>正在上传…</p>}
-            {kind !== "stories" && b.cover && (
-              <div className="uploaded-preview">
-                <img src={b.cover} alt="封面" />
-                <button type="button" onClick={() => set("cover", "")}>
-                  移除封面
-                </button>
-              </div>
-            )}
-            {kind === "stories" && (
-              <>
-                <div className="upload-gallery">
-                  {b.photos.map((p, i) => (
-                    <div key={p}>
-                      <img src={p} alt={"照片" + (i + 1)} />
+                  {q.type === "matrix" && (
+                    <div className="matrix-question-builder">
+                      <div className="matrix-builder-heading">
+                        <h3>陈述行</h3>
+                        <button
+                          type="button"
+                          className="quiet"
+                          onClick={() =>
+                            updateQ(i, "options", [...likertOptions])
+                          }
+                        >
+                          恢复五级认同选项
+                        </button>
+                      </div>
+                      <p className="fine">
+                        每个陈述占一行。调整顺序会保留行标识，已有答卷仍能对应原来的陈述。
+                      </p>
+                      {(q.rows || []).map((row, rowIndex) => (
+                        <div className="matrix-builder-row" key={row.id}>
+                          <span className="matrix-row-number">
+                            {String(rowIndex + 1).padStart(2, "0")}
+                          </span>
+                          <Field
+                            label={`陈述 ${rowIndex + 1}`}
+                            value={row.title}
+                            required
+                            onChange={(title) =>
+                              updateQ(
+                                i,
+                                "rows",
+                                q.rows.map((candidate) =>
+                                  candidate.id === row.id
+                                    ? { ...candidate, title }
+                                    : candidate,
+                                ),
+                              )
+                            }
+                          />
+                          <div className="matrix-row-actions">
+                            <button
+                              type="button"
+                              aria-label={`上移陈述 ${rowIndex + 1}`}
+                              disabled={rowIndex === 0}
+                              onClick={() => {
+                                const rows = [...q.rows];
+                                [rows[rowIndex - 1], rows[rowIndex]] = [
+                                  rows[rowIndex],
+                                  rows[rowIndex - 1],
+                                ];
+                                updateQ(i, "rows", rows);
+                              }}
+                            >
+                              <ArrowUp />
+                            </button>
+                            <button
+                              type="button"
+                              aria-label={`下移陈述 ${rowIndex + 1}`}
+                              disabled={rowIndex === q.rows.length - 1}
+                              onClick={() => {
+                                const rows = [...q.rows];
+                                [rows[rowIndex + 1], rows[rowIndex]] = [
+                                  rows[rowIndex],
+                                  rows[rowIndex + 1],
+                                ];
+                                updateQ(i, "rows", rows);
+                              }}
+                            >
+                              <ArrowDown />
+                            </button>
+                            <button
+                              type="button"
+                              aria-label={`删除陈述 ${rowIndex + 1}`}
+                              className="danger"
+                              onClick={() =>
+                                updateQ(
+                                  i,
+                                  "rows",
+                                  q.rows.filter(
+                                    (candidate) => candidate.id !== row.id,
+                                  ),
+                                )
+                              }
+                            >
+                              <Trash />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
                       <button
                         type="button"
-                        aria-label="移除照片"
+                        className="quiet"
                         onClick={() =>
-                          set(
-                            "photos",
-                            b.photos.filter((_, j) => j !== i),
+                          updateQ(i, "rows", [
+                            ...(q.rows || []),
+                            { id: crypto.randomUUID(), title: "" },
+                          ])
+                        }
+                      >
+                        <Plus /> 添加陈述行
+                      </button>
+                    </div>
+                  )}
+                  <div className="field-grid">
+                    <Field
+                      label="所属章节（留空为“问题”）"
+                      value={q.section}
+                      onChange={(v) => updateQ(i, "section", v)}
+                    />
+                    {["multiple", "multirank"].includes(q.type) && (
+                      <>
+                        <Field
+                          label="最少选择（0为不限）"
+                          type="number"
+                          min="0"
+                          value={q.min}
+                          onChange={(v) => updateQ(i, "min", v)}
+                        />
+                        <Field
+                          label="最多选择（0为不限）"
+                          type="number"
+                          min="0"
+                          value={q.max}
+                          onChange={(v) => updateQ(i, "max", v)}
+                        />
+                      </>
+                    )}
+                  </div>
+                  <Toggle
+                    label="必答"
+                    value={q.required}
+                    onChange={(v) => updateQ(i, "required", v)}
+                  />
+                  {["single", "multiple", "multirank"].includes(q.type) && (
+                    <Toggle
+                      label="允许选择“其他”并补充文字"
+                      value={q.allowOther}
+                      onChange={(v) => updateQ(i, "allowOther", v)}
+                    />
+                  )}
+                  {terminatingTypes.includes(q.type) && (
+                    <details className="option-rules-editor">
+                      <summary>
+                        选项规则 · 提前结束
+                        {exclusiveTypes.includes(q.type) ? " / 排他选择" : ""}
+                      </summary>
+                      <p className="fine">
+                        提前结束：选中后，本题之后的问题不再要求作答，确认提交后记录为“提前结束”。
+                      </p>
+                      {exclusiveTypes.includes(q.type) && (
+                        <p className="fine">
+                          排他选择：该选项只能单独选；选中时清除本题其他选择。它单独作答时不受最少选择数限制。
+                        </p>
+                      )}
+                      {questionOptions(q).length ? (
+                        <div className="option-rule-list">
+                          {questionOptions(q).map((option) => (
+                            <div className="option-rule-row" key={option}>
+                              <strong>{option}</strong>
+                              <label className="check">
+                                <input
+                                  type="checkbox"
+                                  aria-label={`提前结束：${option}`}
+                                  checked={(q.terminateOptions || []).includes(
+                                    option,
+                                  )}
+                                  onChange={(event) =>
+                                    toggleOptionRule(
+                                      i,
+                                      "terminateOptions",
+                                      option,
+                                      event.target.checked,
+                                    )
+                                  }
+                                />
+                                提前结束
+                              </label>
+                              {exclusiveTypes.includes(q.type) && (
+                                <label className="check">
+                                  <input
+                                    type="checkbox"
+                                    aria-label={`排他：${option}`}
+                                    checked={exclusiveOptionsFor(q).includes(
+                                      option,
+                                    )}
+                                    disabled={option === "以上都无"}
+                                    onChange={(event) =>
+                                      toggleOptionRule(
+                                        i,
+                                        "exclusiveOptions",
+                                        option,
+                                        event.target.checked,
+                                      )
+                                    }
+                                  />
+                                  排他{option === "以上都无" ? "（固定）" : ""}
+                                </label>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="fine">先填写选项，再设置规则。</p>
+                      )}
+                      {exclusiveTypes.includes(q.type) && (
+                        <button
+                          type="button"
+                          className="quiet"
+                          onClick={() => addExclusiveNone(i)}
+                        >
+                          <Plus /> 添加以上都无（排他）
+                        </button>
+                      )}
+                      <p className="fine">
+                        删除或重命名选项后，对应规则与后续引用条件会清除，请重新设置。
+                      </p>
+                    </details>
+                  )}
+                  <details>
+                    <summary>条件显示 / 自动跳题</summary>
+                    <label>
+                      当之前的哪一题
+                      <select
+                        value={q.condition?.questionId || ""}
+                        onChange={(e) =>
+                          updateQ(
+                            i,
+                            "condition",
+                            e.target.value
+                              ? { questionId: e.target.value, value: "" }
+                              : null,
                           )
                         }
                       >
-                        <X />
-                      </button>
-                    </div>
-                  ))}
-                </div>
+                        <option value="">始终显示</option>
+                        {b.questions
+                          .slice(0, i)
+                          .filter((x) => choiceTypes.includes(x.type))
+                          .map((x) => (
+                            <option key={x.id} value={x.id}>
+                              {x.title || "未命名题目"}
+                            </option>
+                          ))}
+                      </select>
+                    </label>
+                    {q.condition?.questionId && (
+                      <label>
+                        选中以下答案时，才显示本题
+                        <select
+                          value={q.condition.value}
+                          onChange={(e) =>
+                            updateQ(i, "condition", {
+                              ...q.condition,
+                              value: e.target.value,
+                            })
+                          }
+                        >
+                          <option value="">选择一个答案</option>
+                          {questionOptions(
+                            b.questions.find(
+                              (x) => x.id === q.condition.questionId,
+                            ) || {},
+                          ).map((o) => (
+                            <option value={o} key={o}>
+                              {o}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    )}
+                  </details>
+                </section>
+              ))}
+              <button
+                type="button"
+                className="quiet"
+                onClick={() =>
+                  set("questions", [...b.questions, newQuestion()])
+                }
+              >
+                <Plus /> 添加题目
+              </button>
+              <button
+                type="button"
+                className="quiet"
+                onClick={() =>
+                  set("questions", [...b.questions, newMatrixQuestion(true)])
+                }
+              >
+                <Plus /> 插入生活费感受矩阵示例
+              </button>
+              <button
+                type="button"
+                className="quiet"
+                onClick={() => setPreview(!preview)}
+              >
+                <Eye />
+                {preview ? "关闭预览" : "预览问卷"}
+              </button>
+            </>
+          ) : (
+            <>
+              <RichEditor
+                content={b.content}
+                body={b.body}
+                photos={kind === "stories" ? b.photos : []}
+                onChange={(document) =>
+                  setB((prev) => ({ ...prev, ...document }))
+                }
+                onUploadingChange={setInlineUploading}
+              />
+              {kind === "projects" && (
                 <div className="field-grid">
                   <Field
-                    label="拍摄 / 旅行日期"
-                    type="date"
-                    value={b.date}
-                    onChange={(v) => set("date", v)}
+                    label="分类"
+                    value={b.category}
+                    onChange={(v) => set("category", v)}
                   />
                   <Field
-                    label="地点名称"
-                    value={b.location}
-                    onChange={(v) => set("location", v)}
+                    label="进度状态"
+                    value={b.status}
+                    onChange={(v) => set("status", v)}
                   />
                   <Field
-                    label="附近城市（远景聚合用）"
-                    value={b.city}
-                    onChange={(v) => set("city", v)}
+                    label="项目链接"
+                    type="url"
+                    value={b.link}
+                    onChange={(v) => set("link", v)}
                   />
                 </div>
-                <div className="place-search">
-                  <Field
-                    label="搜索地址或景点"
-                    value={query}
-                    onChange={setQuery}
-                  />
-                  <button type="button" onClick={search}>
-                    搜索地点
-                  </button>
-                </div>
-                {places.map((p, i) => (
-                  <button
-                    className="place-result"
-                    type="button"
-                    key={i}
-                    onClick={() => {
-                      setB((prev) => ({
-                        ...prev,
-                        lat: Number(p.lat),
-                        lng: Number(p.lon),
-                        location: p.display_name,
-                        city:
-                          p.address?.city ||
-                          p.address?.town ||
-                          p.address?.county ||
-                          p.name ||
-                          "",
-                        cityLat: Number(p.lat),
-                        cityLng: Number(p.lon),
-                        confirmLocation: false,
-                      }));
-                      setPlaces([]);
-                      setGpsFound(true);
-                    }}
-                  >
-                    {p.display_name}
-                  </button>
-                ))}
-                <div className="field-grid">
-                  <Field
-                    label="精确纬度"
-                    type="number"
-                    step="any"
-                    min="-90"
-                    max="90"
-                    value={b.lat}
-                    onChange={(v) => set("lat", v)}
-                  />
-                  <Field
-                    label="精确经度"
-                    type="number"
-                    step="any"
-                    min="-180"
-                    max="180"
-                    value={b.lng}
-                    onChange={(v) => set("lng", v)}
-                  />
-                </div>
-                {gpsFound && (
-                  <p className="fine">
-                    已读取或选择坐标，请确认地点名称和位置。
-                  </p>
-                )}
-                <Suspense fallback={<p>正在打开地图…</p>}>
-                  <World
-                    compact
-                    pick={{ lat: b.lat, lng: b.lng }}
-                    onPick={pick}
-                  />
-                </Suspense>
-                <Toggle
-                  label="我已确认这个精确位置可以公开"
-                  value={b.confirmLocation}
-                  onChange={(v) => set("confirmLocation", v)}
+              )}
+              {kind === "posts" && (
+                <Field
+                  label="列表摘要"
+                  value={b.excerpt}
+                  onChange={(v) => set("excerpt", v)}
                 />
-              </>
-            )}
-          </>
-        )}
-        {error && <p className="error">{error}</p>}
-        <div className="editor-save">
-          <Toggle
-            label="发布到网站（取消则保存为草稿）"
-            value={b.published}
-            onChange={(v) => set("published", v)}
-          />
-          <button className="button" disabled={busy || uploading}>
-            <FloppyDisk />
-            {busy ? "正在保存…" : "保存"}
-          </button>
+              )}
+              <label>
+                {kind === "stories"
+                  ? "上传照片（最多20张，每张15MB）"
+                  : "上传封面"}
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  multiple={kind === "stories"}
+                  disabled={uploading}
+                  onChange={upload}
+                />
+              </label>
+              {uploading && <p>正在上传…</p>}
+              {kind !== "stories" && b.cover && (
+                <div className="uploaded-preview">
+                  <img src={b.cover} alt="封面" />
+                  <button type="button" onClick={() => set("cover", "")}>
+                    移除封面
+                  </button>
+                </div>
+              )}
+              {kind === "stories" && (
+                <>
+                  <div className="upload-gallery">
+                    {b.photos.map((p, i) => (
+                      <div key={p}>
+                        <img src={p} alt={"照片" + (i + 1)} />
+                        <button
+                          type="button"
+                          aria-label="移除照片"
+                          onClick={() =>
+                            set(
+                              "photos",
+                              b.photos.filter((_, j) => j !== i),
+                            )
+                          }
+                        >
+                          <X />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="field-grid">
+                    <Field
+                      label="拍摄 / 旅行日期"
+                      type="date"
+                      value={b.date}
+                      onChange={(v) => set("date", v)}
+                    />
+                    <Field
+                      label="地点名称"
+                      value={b.location}
+                      onChange={(v) => set("location", v)}
+                    />
+                    <Field
+                      label="附近城市（远景聚合用）"
+                      value={b.city}
+                      onChange={(v) => set("city", v)}
+                    />
+                  </div>
+                  <div className="place-search">
+                    <Field
+                      label="搜索地址或景点"
+                      value={query}
+                      onChange={setQuery}
+                    />
+                    <button type="button" onClick={search}>
+                      搜索地点
+                    </button>
+                  </div>
+                  {places.map((p, i) => (
+                    <button
+                      className="place-result"
+                      type="button"
+                      key={i}
+                      onClick={() => {
+                        setB((prev) => ({
+                          ...prev,
+                          lat: Number(p.lat),
+                          lng: Number(p.lon),
+                          location: p.display_name,
+                          city:
+                            p.address?.city ||
+                            p.address?.town ||
+                            p.address?.county ||
+                            p.name ||
+                            "",
+                          cityLat: Number(p.lat),
+                          cityLng: Number(p.lon),
+                          confirmLocation: false,
+                        }));
+                        setPlaces([]);
+                        setGpsFound(true);
+                      }}
+                    >
+                      {p.display_name}
+                    </button>
+                  ))}
+                  <div className="field-grid">
+                    <Field
+                      label="精确纬度"
+                      type="number"
+                      step="any"
+                      min="-90"
+                      max="90"
+                      value={b.lat}
+                      onChange={(v) =>
+                        setB((prev) => ({
+                          ...prev,
+                          lat: v,
+                          confirmLocation: false,
+                        }))
+                      }
+                    />
+                    <Field
+                      label="精确经度"
+                      type="number"
+                      step="any"
+                      min="-180"
+                      max="180"
+                      value={b.lng}
+                      onChange={(v) =>
+                        setB((prev) => ({
+                          ...prev,
+                          lng: v,
+                          confirmLocation: false,
+                        }))
+                      }
+                    />
+                  </div>
+                  {gpsFound && (
+                    <p className="fine">
+                      已读取或选择坐标，请确认地点名称和位置。
+                    </p>
+                  )}
+                  <Suspense fallback={<p>正在打开地图…</p>}>
+                    <World
+                      compact
+                      pick={{ lat: b.lat, lng: b.lng }}
+                      onPick={pick}
+                    />
+                  </Suspense>
+                  <Toggle
+                    label="我已确认这个精确位置可以公开"
+                    value={b.confirmLocation}
+                    onChange={(v) => set("confirmLocation", v)}
+                  />
+                </>
+              )}
+            </>
+          )}
         </div>
+        {error && <p className="error">{error}</p>}
+        {kind !== "surveys" && publisher.error && (
+          <p className="error" role="alert">
+            {publisher.error}
+          </p>
+        )}
+        {kind !== "surveys" && (
+          <div className="publishing-panel">
+            <div className="publishing-status" role="status" aria-live="polite">
+              <strong>
+                {publisher.saving
+                  ? "正在保存草稿…"
+                  : publisher.dirty
+                    ? "有尚未保存的修改"
+                    : publisher.message ||
+                      (publisher.meta.draft
+                        ? "草稿已保存"
+                        : "开始写作后自动保存")}
+              </strong>
+              <span>
+                {publisher.meta.published
+                  ? "线上保留已发布版本，点击「更新发布」后才会替换。"
+                  : "草稿仅自己可见，发布后会出现在网站。"}
+              </span>
+              {(uploading || inlineUploading) && (
+                <span>请等待图片上传完成；有失败的图片时请重试或移除。</span>
+              )}
+            </div>
+            <div className="publishing-actions">
+              <button
+                type="button"
+                disabled={
+                  !!publisher.action ||
+                  uploading ||
+                  inlineUploading ||
+                  publisher.saving
+                }
+                onClick={() => publisher.save(true).catch(() => {})}
+              >
+                <FloppyDisk />
+                保存草稿
+              </button>
+              <button
+                type="button"
+                onClick={() => setPreview(!preview)}
+                aria-expanded={preview}
+              >
+                <Eye />
+                {preview ? "收起预览" : "预览文章"}
+              </button>
+              {publisher.meta.published && (
+                <button
+                  type="button"
+                  disabled={!!publisher.action || uploading || inlineUploading}
+                  onClick={publisher.unpublish}
+                >
+                  撤下文章
+                </button>
+              )}
+              <button
+                className="button"
+                disabled={!!publisher.action || uploading || inlineUploading}
+              >
+                {publisher.action
+                  ? "正在处理…"
+                  : publisher.meta.published
+                    ? "更新发布"
+                    : "发布文章"}
+              </button>
+            </div>
+            {publisher.meta.published && (
+              <a
+                className="text-link"
+                href={`/?${kind === "posts" ? "post" : kind === "stories" ? "story" : "project"}=${encodeURIComponent(publisher.meta.id)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                查看已发布文章 <ArrowUpRight />
+              </a>
+            )}
+          </div>
+        )}
+        {kind !== "surveys" && preview && (
+          <section className="article-preview" aria-label="文章预览">
+            <div className="preview-toolbar">
+              <strong>草稿预览</strong>
+              <div className="segmented">
+                <button
+                  type="button"
+                  className={previewSize === "desktop" ? "selected" : ""}
+                  onClick={() => setPreviewSize("desktop")}
+                >
+                  电脑
+                </button>
+                <button
+                  type="button"
+                  className={previewSize === "phone" ? "selected" : ""}
+                  onClick={() => setPreviewSize("phone")}
+                >
+                  手机
+                </button>
+              </div>
+            </div>
+            <div
+              className={`article-preview-frame article-preview-${previewSize}`}
+            >
+              <ArticleContent item={b} preview />
+            </div>
+          </section>
+        )}
+        {kind === "surveys" && (
+          <div className="editor-save">
+            <Toggle
+              label="发布到网站（取消则保存为草稿）"
+              value={b.published}
+              onChange={(v) => set("published", v)}
+            />
+            <button className="button" disabled={busy || uploading}>
+              <FloppyDisk />
+              {busy ? "正在保存…" : "保存"}
+            </button>
+          </div>
+        )}
       </form>
+      {kind === "surveys" && preview && (
+        <Survey key={JSON.stringify(b)} preview={b} />
+      )}
     </>
   );
 }
@@ -1230,82 +1741,377 @@ function Messages({ state, attempt }) {
 }
 function Results({ survey, close }) {
   const [data, setData] = useState(null),
-    [error, setError] = useState("");
+    [error, setError] = useState(""),
+    [filter, setFilter] = useState("all"),
+    [loading, setLoading] = useState(true),
+    [updatedAt, setUpdatedAt] = useState(null);
+  const request = useRef(0);
+  async function refresh() {
+    const token = ++request.current;
+    setLoading(true);
+    setError("");
+    try {
+      const result = await api("/admin/surveys/" + survey.id + "/results");
+      if (token !== request.current) return;
+      setData(result);
+      setUpdatedAt(new Date());
+    } catch (cause) {
+      if (token === request.current) setError(cause.message);
+    } finally {
+      if (token === request.current) setLoading(false);
+    }
+  }
   useEffect(() => {
-    api("/admin/surveys/" + survey.id + "/results")
-      .then(setData)
-      .catch((e) => setError(e.message));
+    refresh();
+    return () => {
+      request.current++;
+    };
   }, [survey.id]);
+  const allRows = data?.rows || [];
+  const rows = allRows.filter(
+    (row) =>
+      filter === "all" ||
+      (filter === "terminated"
+        ? row.completion === "terminated"
+        : row.completion !== "terminated"),
+  );
+  const counts = surveyCompletionCounts(rows);
+  const allCounts = surveyCompletionCounts(allRows);
+  const summary = summarizeSurvey(survey, rows);
+  const filterLabel = {
+    all: "全部答卷",
+    completed: "完整完成",
+    terminated: "提前结束",
+  }[filter];
+  const exportFilter = filter === "all" ? "" : `&completion=${filter}`;
+  const typeNames = {
+    single: "单选分布",
+    multiple: "多选分布",
+    rank: "排序分布",
+    multirank: "多选排序",
+    matrix: "矩阵量表",
+    text: "文字回答",
+  };
+  const percent = (value, denominator) =>
+    denominator
+      ? `${((value / denominator) * 100).toFixed(1).replace(/\.0$/, "")}%`
+      : "—";
   return (
-    <>
+    <section className="survey-dashboard" aria-label="问卷统计">
       <button className="back" onClick={close}>
         <ArrowLeft /> 返回问卷
       </button>
-      <h2>{survey.title}</h2>
-      <div className="row-actions">
-        <a
-          className="button"
-          href={"/api/admin/surveys/" + survey.id + "/export?format=xlsx"}
+      <header className="survey-dashboard-heading">
+        <div>
+          <span className="eyebrow">RESPONSES / 回答的轮廓</span>
+          <h2>{survey.title}</h2>
+          <p>从整体分布到每一份回答，查看这份问卷的真实提交。</p>
+        </div>
+        <div className="survey-dashboard-index" aria-hidden="true">
+          <span>QUESTION ATLAS</span>
+          <strong>{String(survey.questions.length).padStart(2, "0")}</strong>
+          <small>QUESTIONS / 题目</small>
+        </div>
+      </header>
+      <div className="survey-results-controls">
+        <div
+          className="survey-results-filters"
+          role="group"
+          aria-label="按答卷完成状态筛选"
         >
-          下载 Excel
-        </a>
-        <a
-          className="quiet"
-          href={"/api/admin/surveys/" + survey.id + "/export?format=csv"}
+          {[
+            ["all", "全部", allRows.length],
+            ["completed", "完整完成", allCounts.completed],
+            ["terminated", "提前结束", allCounts.terminated],
+          ].map(([value, label, count]) => (
+            <button
+              type="button"
+              key={value}
+              aria-pressed={filter === value}
+              onClick={() => setFilter(value)}
+            >
+              {label}
+              <span>{data ? count : "—"}</span>
+            </button>
+          ))}
+        </div>
+        <button
+          type="button"
+          className="survey-results-refresh"
+          onClick={refresh}
+          disabled={loading}
         >
-          下载 CSV
-        </a>
+          {loading ? "正在读取…" : "↻ 刷新数据"}
+        </button>
       </div>
-      {error && <p className="error">{error}</p>}
+      <div className="survey-data-provenance">
+        <p>当前筛选：{filterLabel} · 图表、逐份记录和导出使用同一范围</p>
+        <span>
+          {updatedAt
+            ? `更新于 ${updatedAt.toLocaleTimeString("zh-CN", { hour12: false })}`
+            : "读取服务器记录"}
+        </span>
+      </div>
+      {error && (
+        <p className="error" role="alert">
+          {error}
+          {data ? "；下方保留上次成功读取的数据。" : ""}
+        </p>
+      )}
+      {!data && loading && <p role="status">正在读取答卷…</p>}
       {data && (
         <>
-          <p>共 {data.rows.length} 份答卷 · 允许重复填写</p>
-          {data.summary.map((q) => (
-            <div className="result-block" key={q.id}>
-              <h3>{q.title}</h3>
-              <span className="fine">{q.answered} 人作答</span>
-              {q.counts &&
-                Object.entries(q.counts).map(([o, n]) => (
-                  <div className="stat-row" key={o}>
-                    <span>{o}</span>
-                    <div>
-                      <i
-                        style={{
-                          width:
-                            (q.answered ? (n / q.answered) * 100 : 0) + "%",
-                        }}
-                      />
-                    </div>
-                    <b>{n}</b>
-                    {q.rank && <small>平均名次 {q.rank[o] ?? "—"}</small>}
-                  </div>
-                ))}
+          <div
+            className="survey-overview-stats"
+            aria-label="当前筛选数据概要"
+            aria-live="polite"
+          >
+            {[
+              ["当前答卷", rows.length, "SUBMISSIONS"],
+              ["完整完成", counts.completed, "COMPLETED"],
+              ["提前结束", counts.terminated, "ENDED EARLY"],
+              ["问卷题目", survey.questions.length, "QUESTIONS"],
+            ].map(([label, value, en]) => (
+              <div key={label}>
+                <span>{label}</span>
+                <strong>{value}</strong>
+                <small>{en}</small>
+              </div>
+            ))}
+          </div>
+          <p className="survey-count-note">
+            数量按答卷计算，允许重复填写，不代表去重人数。提前结束的答卷保留结束前的有效回答。
+          </p>
+          {!rows.length ? (
+            <div className="survey-results-empty">
+              <span className="eyebrow">NO RESPONSES IN THIS VIEW</span>
+              <h3>这个范围还没有答卷。</h3>
+              <p>
+                {allRows.length
+                  ? "切换到其他完成状态，查看已有回答。"
+                  : "有人提交后，选项分布与矩阵统计会显示在这里。"}
+              </p>
             </div>
-          ))}
-          <h2>逐份答卷</h2>
-          {data.rows.map((r, i) => (
+          ) : (
+            <div className="survey-charts-grid" aria-busy={loading}>
+              {summary.map((q, index) => (
+                <article
+                  className={`survey-chart-card ${q.matrix ? "survey-chart-wide" : ""}`}
+                  key={q.id}
+                >
+                  <div className="survey-chart-topline">
+                    <span>
+                      {String(index + 1).padStart(2, "0")} / DISTRIBUTION
+                    </span>
+                    <span>{typeNames[q.type] || "回答分布"}</span>
+                  </div>
+                  <h3>{q.title}</h3>
+                  <p className="survey-chart-deck">
+                    {q.answered} 份有回答 / 当前 {rows.length} 份答卷
+                  </p>
+                  {q.counts && (
+                    <div
+                      className="survey-bars"
+                      aria-label={`${q.title}选项分布`}
+                    >
+                      {Object.entries(q.counts).map(([option, count]) => (
+                        <div className="survey-bar-row" key={option}>
+                          <div className="survey-bar-label">
+                            <span>{option}</span>
+                            <span>
+                              <b>{count}</b> 份{" "}
+                              <em>{percent(count, q.answered)}</em>
+                            </span>
+                          </div>
+                          <div className="survey-bar-track" aria-hidden="true">
+                            <i
+                              style={{
+                                width: `${q.answered ? (count / q.answered) * 100 : 0}%`,
+                              }}
+                            />
+                          </div>
+                          {q.rank && (
+                            <small>
+                              已选该项答卷中的平均名次：{q.rank[option] ?? "—"}
+                            </small>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {q.matrix && (
+                    <div className="survey-matrix-results">
+                      <div className="survey-heatmap-legend">
+                        <i />
+                        <span>颜色越深，该行选择此项的比例越高</span>
+                      </div>
+                      <div
+                        className="survey-heatmap-scroll"
+                        role="region"
+                        aria-label={`${q.title}矩阵分布表，可横向滚动`}
+                        tabIndex={0}
+                      >
+                        <table className="survey-heatmap">
+                          <caption>
+                            每格显示答卷数与占该行有效回答的比例
+                          </caption>
+                          <thead>
+                            <tr>
+                              <th scope="col">陈述</th>
+                              {Object.keys(q.matrix[0]?.counts || {}).map(
+                                (option) => (
+                                  <th scope="col" key={option}>
+                                    {option}
+                                  </th>
+                                ),
+                              )}
+                              <th scope="col">该行回答</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {q.matrix.map((matrixRow) => (
+                              <tr key={matrixRow.id}>
+                                <th scope="row">{matrixRow.title}</th>
+                                {Object.entries(matrixRow.counts).map(
+                                  ([option, count]) => (
+                                    <td
+                                      key={option}
+                                      style={{
+                                        background: `rgba(196, 144, 83, ${count && matrixRow.answered ? 0.1 + (count / matrixRow.answered) * 0.58 : 0.025})`,
+                                      }}
+                                    >
+                                      <strong>{count}</strong>
+                                      <small>
+                                        {percent(count, matrixRow.answered)}
+                                      </small>
+                                    </td>
+                                  ),
+                                )}
+                                <td className="survey-heatmap-total">
+                                  {matrixRow.answered} 份
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+                  {q.type === "text" && (
+                    <div className="survey-text-sample">
+                      {rows
+                        .filter(
+                          (row) =>
+                            typeof row.answers?.[q.id] === "string" &&
+                            row.answers[q.id],
+                        )
+                        .slice(0, 3)
+                        .map((row) => (
+                          <blockquote key={row.id}>
+                            {row.answers[q.id]}
+                          </blockquote>
+                        ))}
+                      <p>
+                        {q.answered
+                          ? "展示前 3 条回答；完整内容可在下方逐份查看或导出。"
+                          : "这道题暂无文字回答。"}
+                      </p>
+                    </div>
+                  )}
+                  <details className="survey-chart-method">
+                    <summary>
+                      如何阅读这张图 <span>＋</span>
+                    </summary>
+                    <p>
+                      {q.matrix
+                        ? "每一行单独计算：该选项的答卷数 ÷ 该行有效回答数。未回答该行的答卷不进入分母；只展示分布，不将文字选项换算为心理分数。"
+                        : q.type === "text"
+                          ? "文字回答保留原文，不自动进行情绪或人格判断。"
+                          : `每个选项的比例 = 选择该项的答卷数 ÷ 本题有回答的答卷数（${q.answered} 份）。${["multiple", "multirank", "rank"].includes(q.type) ? "同一份答卷可包含多个选项，因此比例之和可能超过 100%。" : ""}${q.rank ? "平均名次只计算选择该项的答卷，数值越小代表排序越靠前。" : ""}`}{" "}
+                      统计按当前题目与选项展示；修改前的原始题目和回答保留在逐份记录中。
+                    </p>
+                  </details>
+                </article>
+              ))}
+            </div>
+          )}
+          <div className="survey-submissions-heading">
+            <div>
+              <span className="eyebrow">RESPONSE RECORDS / 原始回答</span>
+              <h3>
+                逐份答卷 <span>{rows.length}</span>
+              </h3>
+            </div>
+            <div className="row-actions">
+              <a
+                className="button"
+                href={`/api/admin/surveys/${survey.id}/export?format=xlsx${exportFilter}`}
+              >
+                下载 Excel
+              </a>
+              <a
+                className="quiet"
+                href={`/api/admin/surveys/${survey.id}/export?format=csv${exportFilter}`}
+              >
+                下载 CSV
+              </a>
+            </div>
+          </div>
+          {rows.map((r, i) => (
             <details className="submission" key={r.id}>
               <summary>
-                答卷 {data.rows.length - i} ·{" "}
-                {new Date(r.createdAt).toLocaleString("zh-CN")}
+                <span>
+                  答卷 {rows.length - i} ·{" "}
+                  {new Date(r.createdAt).toLocaleString("zh-CN")}
+                </span>
+                <span
+                  className={`survey-completion-badge ${r.completion === "terminated" ? "is-terminated" : ""}`}
+                >
+                  {r.completion === "terminated" ? "提前结束" : "完整完成"}
+                </span>
               </summary>
+              {r.completion === "terminated" && (
+                <p className="survey-termination-note">
+                  结束于「{r.termination?.questionTitle || "未记录题目"}」
+                  {r.termination?.option
+                    ? ` · 选项：${r.termination.option}`
+                    : ""}
+                </p>
+              )}
               {(r.questions || survey.questions).map((q) => (
-                <div key={q.id}>
+                <div className="survey-submission-answer" key={q.id}>
                   <strong>{q.title}</strong>
-                  <p>
-                    {Array.isArray(r.answers[q.id])
-                      ? r.answers[q.id].join(" → ")
-                      : r.answers[q.id] || "未作答 / 已跳过"}
-                    {r.answers[q.id + "__other"] &&
-                      " · 其他：" + r.answers[q.id + "__other"]}
-                  </p>
+                  {q.type === "matrix" ? (
+                    <dl className="survey-matrix-answer">
+                      {(q.rows || []).map((row) => (
+                        <div key={row.id}>
+                          <dt>{row.title}</dt>
+                          <dd>
+                            {r.answers?.[q.id]?.[row.id] || "未作答 / 已跳过"}
+                          </dd>
+                        </div>
+                      ))}
+                    </dl>
+                  ) : (
+                    <p>
+                      {Array.isArray(r.answers?.[q.id])
+                        ? r.answers[q.id].join(
+                            q.type.includes("rank") ? " → " : "、",
+                          )
+                        : typeof r.answers?.[q.id] === "string"
+                          ? r.answers[q.id]
+                          : "未作答 / 已跳过"}
+                      {r.answers?.[q.id + "__other"] &&
+                        " · 其他：" + r.answers[q.id + "__other"]}
+                    </p>
+                  )}
                 </div>
               ))}
             </details>
           ))}
         </>
       )}
-    </>
+    </section>
   );
 }
 function Notifications({ state, attempt, busy }) {
