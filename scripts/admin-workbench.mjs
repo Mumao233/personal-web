@@ -87,13 +87,27 @@ export function executeWorkbench(args) {
   });
 }
 
-export function parseWorkbenchResult(result, { isExec = false } = {}) {
+export function parseWorkbenchResult(
+  result,
+  { isExec = false, isTransfer = false } = {},
+) {
   if (result?.timedOut)
     throw safeFailure(
       "ADMIN_TRANSPORT_TIMEOUT",
       "Workbench 超时；服务器操作可能仍在继续。",
       { outcomeUnknown: true },
     );
+  // Workbench v1.0.1 emits transfer progress only to stderr, even with
+  // --output json. This exception is restricted to successful file transfers;
+  // remote exec still requires its structured exit status.
+  if (
+    isTransfer &&
+    !isExec &&
+    result?.code === 0 &&
+    result.stdout === "" &&
+    !result.oversized
+  )
+    return { transferComplete: true };
   let parsed;
   try {
     parsed = JSON.parse(result.stdout);
@@ -262,6 +276,7 @@ export async function runRemoteRequest(
         `${remoteDirectory}/input.json`,
         ...common,
       ]),
+      { isTransfer: true },
     );
     operationStarted = true;
     const executed = await exec(
@@ -281,6 +296,7 @@ export async function runRemoteRequest(
         outputFile,
         ...common,
       ]),
+      { isTransfer: true },
     );
     const info = await stat(outputFile);
     if (info.size > maxJSONBytes)

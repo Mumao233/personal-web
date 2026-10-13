@@ -71,6 +71,7 @@ function mockTransport({
   failRun = false,
   failUpload = false,
   failCleanup = false,
+  emptyTransferOutput = false,
   handler,
 } = {}) {
   const calls = [],
@@ -89,14 +90,18 @@ function mockTransport({
             stdout: JSON.stringify({ code: 4, message: "secret-token" }),
             stderr: "secret-token",
           }
-        : good({ success: true });
+        : emptyTransferOutput
+          ? { code: 0, stdout: "", stderr: "Transfer complete" }
+          : good({ success: true });
     }
     if (args[0] === "download") {
       await writeFile(
         args[2],
         JSON.stringify(handler ? handler(request) : response),
       );
-      return good({ success: true });
+      return emptyTransferOutput
+        ? { code: 0, stdout: "", stderr: "Transfer complete" }
+        : good({ success: true });
     }
     const command = args[args.indexOf("--command") + 1];
     if (command.includes("mktemp"))
@@ -230,6 +235,61 @@ test("Workbench requires successful process and remote statuses and detects time
     parseWorkbenchResult(good({ exit_code: 0, output: "ok" }), { isExec: true })
       .output,
     "ok",
+  );
+});
+
+test("Workbench v1.0.1 transfers accept empty stdout with successful process exit while exec stays structured", async () => {
+  const transport = mockTransport({ emptyTransferOutput: true });
+  const result = await runAdminRequest(
+    { action: "list", kind: "posts" },
+    transport,
+  );
+  assert.equal(result.ok, true);
+  assert.ok(transport.calls.some((args) => args[0] === "upload"));
+  assert.ok(transport.calls.some((args) => args[0] === "download"));
+  assert.deepEqual(
+    parseWorkbenchResult(
+      { code: 0, stdout: "", stderr: "Transfer complete" },
+      { isTransfer: true },
+    ),
+    { transferComplete: true },
+  );
+  assert.throws(() =>
+    parseWorkbenchResult({ code: 0, stdout: "" }, { isExec: true }),
+  );
+});
+
+test("empty transfer failures, timeouts and arbitrary non-JSON output fail closed", async () => {
+  for (const response of [
+    { code: 4, stdout: "", stderr: "credential-secret" },
+    { code: 0, stdout: "", timedOut: true },
+    { code: 0, stdout: "", oversized: true },
+    { code: 0, stdout: "upload complete, trust me" },
+    good({ code: 1 }),
+    good({ success: false }),
+    good({ timed_out: true }),
+  ])
+    assert.throws(() => parseWorkbenchResult(response, { isTransfer: true }));
+  const transport = mockTransport({ emptyTransferOutput: true });
+  const result = await runAdminRequest(
+    { action: "list", kind: "posts" },
+    {
+      executor: (args) =>
+        args[0] === "upload"
+          ? Promise.resolve({
+              code: 4,
+              stdout: "",
+              stderr: "credential-secret",
+            })
+          : transport.executor(args),
+    },
+  );
+  assert.equal(result.ok, false);
+  assert.ok(!JSON.stringify(result).includes("credential-secret"));
+  assert.ok(
+    !transport.calls.some((args) =>
+      args.some((arg) => arg.includes("server/admin-cli.js")),
+    ),
   );
 });
 
