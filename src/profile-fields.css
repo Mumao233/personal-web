@@ -41,36 +41,48 @@
   min-width: 0;
 }
 .profile-public-fields {
-  margin: 28px 0 0;
+  width: 100%;
+  min-width: 0;
+  margin: 20px 0 0;
   display: grid;
-  gap: 0;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 19rem), 1fr));
+  column-gap: clamp(24px, 3vw, 48px);
   font-size: 14px;
 }
 .profile-public-fields > div {
-  padding: 15px 0;
+  min-width: 0;
+  padding: 20px 0;
   border-bottom: 1px solid #ffffff13;
 }
 .profile-public-fields dt {
+  overflow-wrap: anywhere;
   color: #b6a58e;
   font-size: 12px;
   margin-bottom: 7px;
 }
 .profile-public-fields dd {
+  min-width: 0;
   margin: 0;
   overflow-wrap: anywhere;
   line-height: 1.65;
 }
 .profile-public-fields a {
   display: inline-flex;
-  align-items: center;
+  align-items: baseline;
   gap: 8px;
   max-width: 100%;
+  min-width: 0;
+}
+.profile-public-fields a > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 .profile-public-fields a:hover {
   color: #eac591;
 }
 .profile-public-fields a svg {
   flex: 0 0 15px;
+  margin: 0;
 }
 @media (max-width: 900px) {
   .profile-field-inputs {

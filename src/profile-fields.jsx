@@ -198,7 +198,7 @@ export function ProfileFields({ profile }) {
                   target={external ? "_blank" : undefined}
                   rel={external ? "noopener noreferrer" : undefined}
                 >
-                  {field.value}
+                  <span>{field.value}</span>
                   {external && <ArrowUpRight aria-hidden="true" />}
                 </a>
               ) : (

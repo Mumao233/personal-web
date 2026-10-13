@@ -412,10 +412,10 @@ function App() {
                           <small>照片，等一个合适的时刻。</small>
                         </div>
                       )}
-                      <Contact p={p} />
                     </div>
                     <Text>{p.bio}</Text>
                   </div>
+                  <Contact p={p} />
                   <section className="subsection">
                     <h2>最近在关注</h2>
                     <div className="interest-grid">
@@ -618,7 +618,7 @@ export function PageHead({ label, title, subtitle }) {
 }
 function Contact({ p }) {
   return (
-    <div className="contact">
+    <div className="contact" id="profile">
       <span className="eyebrow">PROFILE / 个人资料</span>
       <ProfileFields profile={p} />
     </div>
