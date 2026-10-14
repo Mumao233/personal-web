@@ -13,6 +13,7 @@ import {
   surveyFlow,
   answerError,
   exclusiveOptionsFor,
+  surveyAnswerProgress,
 } from "../server/validation.js";
 import "./survey-advanced.css";
 
@@ -132,7 +133,7 @@ export function QuestionInput({
         {q.required && <span className="required"> *</span>}
       </legend>
       {q.description && <p>{q.description}</p>}
-      {(q.min || q.max) && (
+      {Boolean(q.min || q.max) && (
         <p className="fine">
           {q.min ? `至少${q.min}项 ` : ""}
           {q.max ? `最多${q.max}项` : ""}
@@ -473,6 +474,7 @@ export default function Survey({ id, preview }) {
     );
 
   const { questions, termination } = surveyFlow(survey, answers);
+  const progress = surveyAnswerProgress(survey, answers);
   const sections = surveySections(questions);
   const current = Math.min(section, Math.max(0, sections.length - 1));
   const active = sections[current]?.questions || [];
@@ -653,25 +655,31 @@ export default function Survey({ id, preview }) {
               当前浏览器无法保存本机草稿，回答仍可正常提交；请先不要关闭本页。
             </p>
           )}
-          <div
+          {progress.total > 0 && <div
             className="survey-progress"
             role="progressbar"
-            aria-label="问卷填写进度"
+            aria-label="必答项填写进度"
             aria-valuemin={0}
-            aria-valuemax={Math.max(1, sections.length)}
-            aria-valuenow={current + 1}
+            aria-valuemax={progress.total}
+            aria-valuenow={progress.answered}
+            aria-valuetext={`已填写 ${progress.answered} / ${progress.total} 项必答项，${progress.percent}%，尚未提交`}
           >
             <div
               style={{
                 width:
-                  ((current + 1) / Math.max(1, sections.length)) * 100 + "%",
+                  progress.percent + "%",
               }}
             />
-          </div>
+          </div>}
+          <p className="fine survey-progress-caption" role="status">
+            {termination ? "已触发结束条件，待提交" : progress.total
+              ? `已填写 ${progress.answered} / ${progress.total} 项必答项 · ${progress.percent}%${progress.answered === progress.total ? " · 待提交" : ""}`
+              : "全部为选填，可直接提交"}
+          </p>
           <div className="section-head">
             <h2>{sections[current]?.title || "问题"}</h2>
             <span className="mono">
-              {current + 1} / {Math.max(1, sections.length)}
+              第 {current + 1} / {Math.max(1, sections.length)} 部分
             </span>
           </div>
           <fieldset className="survey-active-section" disabled={busy || uncertain || versionConflict}>

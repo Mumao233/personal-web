@@ -32,7 +32,7 @@ function references(value, name) {
 export function isPublicMedia(name) {
   if (references(publicProfile(setting("profile", {})), name)) return true;
   return ["projects", "posts", "stories"].some(kind =>
-    list(kind).some(record => record.published && references(publicContent(record), name)),
+    list(kind).some(record => record.published && references(publicContent(record, kind), name)),
   );
 }
 

@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef, lazy, Suspense } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import {
   ArrowLeft,
   ArrowRight,
@@ -15,14 +15,18 @@ import {
   UploadSimple,
 } from "@phosphor-icons/react";
 import { api, date } from "./api";
-import { isRevisionConflict, localDate, latestRequest } from "./editor-state";
+import { isRevisionConflict } from "./editor-state";
 import { ConflictRecovery, useLeaveGuard } from "./editor-recovery";
-import ModuleBoundary from "./module-boundary";
 import Survey from "./survey";
 import RichEditor from "./rich-editor";
 import ArticleContent from "./article-content";
 import useDraftPublishing from "./use-draft-publishing";
 import { ProfileFieldsEditor } from "./profile-fields";
+import { PhotoWorkbench, ProjectAttachments } from "./media-workbench";
+import StoryLocationFields from "./story-location-fields";
+import { storyPublicationProblem } from "./media-workbench-state";
+import { publicContent } from "../server/content.js";
+import { calendarDateAt } from "../shared/content-date.js";
 import {
   exclusiveOptionsFor,
   summarizeSurvey,
@@ -30,7 +34,6 @@ import {
 } from "../server/validation.js";
 import "./publishing.css";
 import "./survey-admin.css";
-const World = lazy(() => import("./world"));
 const labels = {
   profile: "个人资料",
   projects: "作品与项目",
@@ -59,12 +62,19 @@ const newContent = (kind) => ({
   category: "",
   status: "",
   excerpt: "",
-  date: localDate(),
+  date: "",
+  dateMode: "auto",
   location: "",
   city: "",
-  lat: 23.1291,
-  lng: 113.2644,
+  lat: "",
+  lng: "",
+  cityLat: "",
+  cityLng: "",
+  publicLocation: "",
+  locationPrecision: kind === "stories" ? "city" : undefined,
   photos: [],
+  photoDetails: kind === "stories" ? [] : undefined,
+  attachments: kind === "projects" ? [] : undefined,
   description: "",
   questions: kind === "surveys" ? [newQuestion()] : [],
   closed: false,
@@ -699,23 +709,28 @@ export function Profile({ data, save, busy, leaveEditor }) {
 export function ContentEditor({ kind, item, save, close, busy, leaveEditor }) {
   const [b, setB] = useState(() => ({
       ...newContent(kind),
-      ...(item.id !== "new" ? { date: "" } : {}),
+      ...(item.id !== "new"
+        ? {
+            date: "",
+            dateMode: undefined,
+            locationPrecision: undefined,
+            publicLocation: undefined,
+          }
+        : {}),
       ...item,
       ...item.draft,
     })),
     [preview, setPreview] = useState(false),
     [uploading, setUploading] = useState(false),
     [inlineUploading, setInlineUploading] = useState(false),
+    [mediaUploading, setMediaUploading] = useState(false),
     [previewSize, setPreviewSize] = useState("desktop"),
-    [error, setError] = useState(""),
-    [places, setPlaces] = useState([]),
-    [query, setQuery] = useState(""),
-    [gpsFound, setGpsFound] = useState(false);
+    [error, setError] = useState("");
   const publisher = useDraftPublishing(
     kind,
     item,
     b,
-    uploading || inlineUploading,
+    uploading || inlineUploading || mediaUploading,
   );
   const [surveySaving, setSurveySaving] = useState(false);
   const [surveyConflict, setSurveyConflict] = useState(false);
@@ -723,10 +738,6 @@ export function ContentEditor({ kind, item, save, close, busy, leaveEditor }) {
   const [editorEpoch, setEditorEpoch] = useState(0);
   const surveySaved = useRef(JSON.stringify(b));
   const saveLock = useRef(false);
-  const searches = useRef(latestRequest());
-  const activeQuery = useRef(query);
-  activeQuery.current = query;
-  useEffect(() => () => searches.current.invalidate(), []);
   async function saveSurvey() {
     if (saveLock.current || surveyConflict) return false;
     saveLock.current = true;
@@ -776,6 +787,9 @@ export function ContentEditor({ kind, item, save, close, busy, leaveEditor }) {
       const snapshot = {
         ...newContent(kind),
         date: "",
+        dateMode: undefined,
+        locationPrecision: undefined,
+        publicLocation: undefined,
         ...record,
         ...record.draft,
       };
@@ -879,92 +893,34 @@ export function ContentEditor({ kind, item, save, close, busy, leaveEditor }) {
       ),
     }));
   }
-  useEffect(() => {
-    if (kind !== "stories" || !gpsFound) return;
-    let active = true;
-    setB((prev) => ({ ...prev, confirmLocation: false }));
-    const t = setTimeout(() => {
-      api(`/admin/reverse?lat=${b.lat}&lng=${b.lng}`)
-        .then((d) => {
-          if (active)
-            setB((prev) => ({
-              ...prev,
-              city: d.city,
-              cityLat: d.cityLat,
-              cityLng: d.cityLng,
-              location: prev.location || d.location,
-            }));
-        })
-        .catch(() => {
-          if (active) setError("自动识别城市暂不可用，请手动填写附近城市。");
-        });
-    }, 1100);
-    return () => {
-      active = false;
-      clearTimeout(t);
-    };
-  }, [b.lat, b.lng, gpsFound]);
   async function upload(e) {
     const selected = [...e.target.files];
+    e.target.value = "";
     if (!selected.length) return;
     setUploading(true);
     setError("");
     try {
-      if (kind === "stories") {
-        const exifr = await import("exifr");
-        for (const f of selected) {
-          const gps = await exifr.gps(f).catch(() => null);
-          if (gps) {
-            setB((prev) => ({
-              ...prev,
-              lat: gps.latitude,
-              lng: gps.longitude,
-            }));
-            setGpsFound(true);
-            break;
-          }
-        }
-      }
       const form = new FormData();
-      selected.forEach((f) => form.append("files", f));
+      form.append("files", selected[0]);
       const r = await api("/admin/upload", { method: "POST", body: form });
-      if (!r.files.length) throw Error("请上传 JPG、PNG、WebP、GIF 或 PDF");
-      if (kind === "stories")
-        setB((prev) => ({
-          ...prev,
-          photos: [...prev.photos, ...r.files.map((f) => f.url)],
-        }));
-      else set("cover", r.files[0].url);
+      if (!r.files.length) throw Error("请上传 JPG、PNG、WebP 或 GIF");
+      set("cover", r.files[0].url);
     } catch (e) {
       setError(e.message);
     } finally {
       setUploading(false);
     }
   }
-  async function search(e) {
-    e.preventDefault();
-    const request = searches.current.next();
-    const requestedQuery = query;
-    try {
-      const result = await api(
-        "/geocode?q=" + encodeURIComponent(requestedQuery),
-      );
-      if (
-        searches.current.isCurrent(request) &&
-        activeQuery.current === requestedQuery
-      )
-        setPlaces(result);
-    } catch (e) {
-      if (
-        searches.current.isCurrent(request) &&
-        activeQuery.current === requestedQuery
-      )
-        setError(e.message);
+  function publishContent() {
+    if (kind === "stories") {
+      const problem = storyPublicationProblem(b);
+      if (problem) {
+        setError(problem);
+        return;
+      }
     }
-  }
-  function pick(c) {
-    setB((prev) => ({ ...prev, lat: Number(c.lat), lng: Number(c.lng) }));
-    setGpsFound(true);
+    setError("");
+    publisher.publish();
   }
   if (item.showResults) return <Results survey={item} close={close} />;
   return (
@@ -977,7 +933,7 @@ export function ContentEditor({ kind, item, save, close, busy, leaveEditor }) {
         onSubmit={(e) => {
           e.preventDefault();
           if (kind !== "surveys") {
-            publisher.publish();
+            publishContent();
             return;
           }
           saveSurvey().then((saved) => {
@@ -1493,160 +1449,95 @@ export function ContentEditor({ kind, item, save, close, busy, leaveEditor }) {
                   onChange={(v) => set("excerpt", v)}
                 />
               )}
-              <label>
-                {kind === "stories"
-                  ? "上传照片（最多20张，每张15MB）"
-                  : "上传封面"}
-                <input
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp,image/gif"
-                  multiple={kind === "stories"}
-                  disabled={uploading}
-                  onChange={upload}
-                />
-              </label>
-              {uploading && <p>正在上传…</p>}
-              {kind !== "stories" && b.cover && (
-                <div className="uploaded-preview">
-                  <img src={b.cover} alt="封面" />
-                  <button type="button" onClick={() => set("cover", "")}>
-                    移除封面
-                  </button>
-                </div>
-              )}
-              {kind === "stories" && (
-                <>
-                  <div className="upload-gallery">
-                    {b.photos.map((p, i) => (
-                      <div key={p}>
-                        <img src={p} alt={"照片" + (i + 1)} />
-                        <button
-                          type="button"
-                          aria-label="移除照片"
-                          onClick={() =>
-                            set(
-                              "photos",
-                              b.photos.filter((_, j) => j !== i),
-                            )
-                          }
-                        >
-                          <X />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="field-grid">
-                    <Field
-                      label="拍摄 / 旅行日期"
-                      type="date"
-                      value={b.date}
-                      onChange={(v) => set("date", v)}
-                    />
-                    <Field
-                      label="地点名称"
-                      value={b.location}
-                      onChange={(v) => set("location", v)}
-                    />
-                    <Field
-                      label="附近城市（远景聚合用）"
-                      value={b.city}
-                      onChange={(v) => set("city", v)}
-                    />
-                  </div>
-                  <div className="place-search">
-                    <Field
-                      label="搜索地址或景点"
-                      value={query}
-                      onChange={(value) => {
-                        searches.current.invalidate();
-                        setQuery(value);
-                        setPlaces([]);
-                      }}
-                    />
-                    <button type="button" onClick={search}>
-                      搜索地点
-                    </button>
-                  </div>
-                  {places.map((p, i) => (
-                    <button
-                      className="place-result"
-                      type="button"
-                      key={i}
-                      onClick={() => {
-                        setB((prev) => ({
-                          ...prev,
-                          lat: Number(p.lat),
-                          lng: Number(p.lon),
-                          location: p.display_name,
-                          city:
-                            p.address?.city ||
-                            p.address?.town ||
-                            p.address?.county ||
-                            p.name ||
-                            "",
-                          cityLat: Number(p.lat),
-                          cityLng: Number(p.lon),
-                          confirmLocation: false,
-                        }));
-                        setPlaces([]);
-                        setGpsFound(true);
-                      }}
-                    >
-                      {p.display_name}
-                    </button>
-                  ))}
-                  <div className="field-grid">
-                    <Field
-                      label="精确纬度"
-                      type="number"
-                      step="any"
-                      min="-90"
-                      max="90"
-                      value={b.lat}
-                      onChange={(v) =>
-                        setB((prev) => ({
-                          ...prev,
-                          lat: v,
-                          confirmLocation: false,
-                        }))
-                      }
-                    />
-                    <Field
-                      label="精确经度"
-                      type="number"
-                      step="any"
-                      min="-180"
-                      max="180"
-                      value={b.lng}
-                      onChange={(v) =>
-                        setB((prev) => ({
-                          ...prev,
-                          lng: v,
-                          confirmLocation: false,
-                        }))
-                      }
-                    />
-                  </div>
-                  {gpsFound && (
-                    <p className="fine">
-                      已读取或选择坐标，请确认地点名称和位置。
-                    </p>
+              <div className="content-date-settings">
+                <Field
+                  label={
+                    kind === "stories"
+                      ? "拍摄 / 旅行日期（未知可留空）"
+                      : "内容日期（可手动指定）"
+                  }
+                  type="date"
+                  value={calendarDateAt(
+                    b.date ||
+                      (b.dateMode === "auto" && publisher.meta.published
+                        ? publisher.meta.date
+                        : ""),
                   )}
-                  <ModuleBoundary label="地点地图">
-                    <Suspense fallback={<p>正在打开地图…</p>}>
-                      <World
-                        compact
-                        pick={{ lat: b.lat, lng: b.lng }}
-                        onPick={pick}
-                      />
-                    </Suspense>
-                  </ModuleBoundary>
+                  onChange={(date) =>
+                    setB((previous) => ({
+                      ...previous,
+                      date,
+                      dateMode: "manual",
+                    }))
+                  }
+                />
+                {kind !== "stories" && (
                   <Toggle
-                    label="我已确认这个精确位置可以公开"
-                    value={b.confirmLocation}
-                    onChange={(v) => set("confirmLocation", v)}
+                    label="首次发布时自动使用北京时间日期"
+                    value={b.dateMode === "auto"}
+                    onChange={(automatic) =>
+                      setB((previous) => ({
+                        ...previous,
+                        dateMode: automatic ? "auto" : "manual",
+                        ...(automatic && !publisher.meta.published
+                          ? { date: "" }
+                          : {}),
+                      }))
+                    }
+                  />
+                )}
+                <p className="fine">
+                  {kind === "stories"
+                    ? "没有拍摄日期时保持空白。新故事中同一日拍摄的照片成功上传后可自动填入；追加照片不会覆盖已有或手工日期。"
+                    : b.dateMode === "auto"
+                      ? "尚未发布时日期留空，第一次发布采用北京时间日历日期；后续更新保留原日期。"
+                      : "手动日期不会被发布或追加内容覆盖。"}
+                </p>
+              </div>
+              {kind === "stories" ? (
+                <>
+                  <PhotoWorkbench
+                    key={`photos-${editorEpoch}`}
+                    value={b}
+                    onChange={setB}
+                    onBlockedChange={setMediaUploading}
+                    isNew={item.id === "new"}
+                  />
+                  <StoryLocationFields
+                    key={`location-${editorEpoch}`}
+                    value={b}
+                    onChange={setB}
                   />
                 </>
+              ) : (
+                <>
+                  <label>
+                    上传封面
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp,image/gif"
+                      disabled={uploading}
+                      onChange={upload}
+                    />
+                  </label>
+                  {uploading && <p>正在上传…</p>}
+                  {b.cover && (
+                    <div className="uploaded-preview">
+                      <img src={b.cover} alt="封面" />
+                      <button type="button" onClick={() => set("cover", "")}>
+                        移除封面
+                      </button>
+                    </div>
+                  )}
+                </>
+              )}
+              {kind === "projects" && (
+                <ProjectAttachments
+                  key={`attachments-${editorEpoch}`}
+                  value={b}
+                  onChange={setB}
+                  onBlockedChange={setMediaUploading}
+                />
               )}
             </>
           )}
@@ -1679,8 +1570,10 @@ export function ContentEditor({ kind, item, save, close, busy, leaveEditor }) {
                   ? "线上保留已发布版本，点击「更新发布」后才会替换。"
                   : "草稿仅自己可见，发布后会出现在网站。"}
               </span>
-              {(uploading || inlineUploading) && (
-                <span>请等待图片上传完成；有失败的图片时请重试或移除。</span>
+              {(uploading || inlineUploading || mediaUploading) && (
+                <span>
+                  请完成照片、正文图片和附件上传；待上传或失败的文件须上传、重试或移除。
+                </span>
               )}
             </div>
             <div className="publishing-actions">
@@ -1690,6 +1583,7 @@ export function ContentEditor({ kind, item, save, close, busy, leaveEditor }) {
                   !!publisher.action ||
                   uploading ||
                   inlineUploading ||
+                  mediaUploading ||
                   publisher.saving ||
                   publisher.conflict
                 }
@@ -1713,6 +1607,7 @@ export function ContentEditor({ kind, item, save, close, busy, leaveEditor }) {
                     !!publisher.action ||
                     uploading ||
                     inlineUploading ||
+                    mediaUploading ||
                     publisher.conflict
                   }
                   onClick={publisher.unpublish}
@@ -1726,6 +1621,7 @@ export function ContentEditor({ kind, item, save, close, busy, leaveEditor }) {
                   !!publisher.action ||
                   uploading ||
                   inlineUploading ||
+                  mediaUploading ||
                   publisher.conflict
                 }
               >
@@ -1772,7 +1668,11 @@ export function ContentEditor({ kind, item, save, close, busy, leaveEditor }) {
             <div
               className={`article-preview-frame article-preview-${previewSize}`}
             >
-              <ArticleContent item={b} preview />
+              <ArticleContent
+                item={publicContent(b, kind)}
+                kind={kind}
+                preview
+              />
             </div>
           </section>
         )}

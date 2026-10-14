@@ -1,4 +1,5 @@
 // Rich articles remain structured data. No HTML from an editor is stored or rendered.
+import { calendarDateAt, isCalendarDate } from "../shared/content-date.js";
 const blockTypes = new Set([
   "paragraph",
   "heading",
@@ -21,6 +22,7 @@ const editableStrings = {
   date: 40,
   location: 2000,
   city: 300,
+  publicLocation: 300,
 };
 const own = (object, key) => Object.prototype.hasOwnProperty.call(object, key);
 const fail = (message, status = 400) => {
@@ -186,7 +188,40 @@ export function documentText(document) {
   return walk(document).trim();
 }
 
-export function editableContent(input, base = {}) {
+function calendarDate(value, label) {
+  if (value !== "" && !isCalendarDate(value)) fail(`${label}需要有效的YYYY-MM-DD日期`);
+  return value;
+}
+function coordinate(value, key) {
+  if (value === "" || value === null) return null;
+  if (!["number", "string"].includes(typeof value) ||
+      (typeof value === "string" && !value.trim()) || !Number.isFinite(Number(value)) ||
+      Math.abs(Number(value)) > (key.toLowerCase().includes("lat") ? 90 : 180))
+    fail("地点坐标无效或超出范围");
+  return Number(value);
+}
+export function safeArticleAttachment(value) {
+  return typeof value === "string" && value.length <= 250 &&
+    !value.includes("..") && /^\/uploads\/[a-z0-9][a-z0-9._-]*\.pdf$/i.test(value);
+}
+function normalizeAttachments(value) {
+  if (!Array.isArray(value) || value.length > 20) fail("PDF附件最多20项");
+  const seen = new Set();
+  return value.map((item) => {
+    if (!object(item) || Object.keys(item).some(key => !["src", "name", "size", "version", "date"].includes(key)) ||
+        !safeArticleAttachment(item.src) || seen.has(item.src)) fail("附件地址必须是本站PDF且不能重复");
+    seen.add(item.src);
+    if (!Number.isSafeInteger(item.size) || item.size < 1 || item.size > 15 * 1024 * 1024)
+      fail("附件大小无效或超过15 MiB");
+    const name = string(item.name, 240, "附件名称").trim();
+    if (!name || /[\u0000-\u001f\u007f]/.test(name)) fail("附件名称无效");
+    return { src: item.src, name, size: item.size,
+      version: string(item.version ?? "", 100, "附件版本"),
+      date: calendarDate(item.date ?? "", "附件日期") };
+  });
+}
+
+export function editableContent(input, base = {}, { kind, isNew = false } = {}) {
   if (!object(input)) fail("文章格式无效");
   const result = {};
   // Only content fields can cross this boundary; IDs, revisions, drafts and
@@ -197,25 +232,63 @@ export function editableContent(input, base = {}) {
   }
   for (const key of ["lat", "lng", "cityLat", "cityLng"]) {
     const value = own(input, key) ? input[key] : base[key];
-    if (value !== undefined && value !== "" && value !== null) {
-      if (
-        !["number", "string"].includes(typeof value) ||
-        !Number.isFinite(Number(value))
-      )
-        fail("地点坐标无效");
-      result[key] = Number(value);
-    }
+    if (value !== undefined) result[key] = coordinate(value, key);
+  }
+  if (own(input, "date") && (isNew || input.date !== base.date || base.dateMode !== undefined))
+    calendarDate(input.date, "内容日期");
+  const explicitDateChange = own(input, "date") && input.date !== base.date;
+  const dateMode = own(input, "dateMode") ? input.dateMode :
+    explicitDateChange && input.date ? "manual" : base.dateMode ?? (isNew ? "auto" : undefined);
+  if (dateMode !== undefined) {
+    if (!["auto", "manual"].includes(dateMode)) fail("日期模式无效");
+    result.dateMode = dateMode;
+  }
+  const precision = own(input, "locationPrecision") ? input.locationPrecision :
+    base.locationPrecision ?? (kind === "stories" && isNew ? "city" : undefined);
+  if (precision !== undefined) {
+    if (!["exact", "city", "hidden"].includes(precision)) fail("位置公开精度无效");
+    result.locationPrecision = precision;
   }
   if (own(input, "confirmLocation") || own(base, "confirmLocation"))
     result.confirmLocation =
       (own(input, "confirmLocation")
         ? input.confirmLocation
         : base.confirmLocation) === true;
+  const publicLocationKeys = precision === "city" ? ["locationPrecision", "cityLat", "cityLng", "publicLocation"] :
+    ["locationPrecision", "lat", "lng", "publicLocation"];
+  if (input.confirmLocation !== true && publicLocationKeys.some(key => own(input, key) && result[key] !== base[key]))
+    result.confirmLocation = false;
   const photos = own(input, "photos") ? input.photos : base.photos;
   if (photos !== undefined) {
     if (!Array.isArray(photos) || photos.length > 200)
       fail("相册照片格式无效或超过200张");
-    result.photos = photos.map((photo) => string(photo, 2000, "相册图片"));
+    photos.forEach(photo => string(photo, 2000, "相册图片"));
+    // Older versions accepted arbitrary photo URLs. Keep unchanged legacy albums
+    // editable; only newly supplied or changed albums must use local media paths.
+    const changed = isNew || JSON.stringify(photos) !== JSON.stringify(base.photos);
+    if (changed && (new Set(photos).size !== photos.length || photos.some(photo => !safeArticleImage(photo))))
+      fail("相册图片必须是本站图片且不能重复");
+    result.photos = [...photos];
+  }
+  const photoDetails = own(input, "photoDetails") ? input.photoDetails : base.photoDetails;
+  if (photoDetails !== undefined) {
+    if (!Array.isArray(photoDetails) || photoDetails.length > 200) fail("照片资料最多200项");
+    const seen = new Set();
+    result.photoDetails = photoDetails.map(item => {
+      if (!object(item) || Object.keys(item).some(key => !["src", "alt", "caption", "takenAt", "lat", "lng"].includes(key)) ||
+          !safeArticleImage(item.src) || seen.has(item.src) || !result.photos?.includes(item.src))
+        fail("照片资料必须对应相册内的唯一图片");
+      seen.add(item.src);
+      const detail = { src: item.src, alt: string(item.alt ?? "", 1000, "图片替代文字"),
+        caption: string(item.caption ?? "", 2000, "图片说明"), takenAt: calendarDate(item.takenAt ?? "", "拍摄日期") };
+      for (const key of ["lat", "lng"]) if (own(item, key)) detail[key] = coordinate(item[key], key);
+      return detail;
+    });
+  }
+  const attachments = own(input, "attachments") ? input.attachments : base.attachments;
+  if (attachments !== undefined) {
+    if (kind !== "projects") fail("只有项目支持PDF附件");
+    result.attachments = normalizeAttachments(attachments);
   }
   const content = own(input, "content") ? input.content : base.content;
   if (own(input, "content") && content === null)
@@ -225,6 +298,15 @@ export function editableContent(input, base = {}) {
     result.body = documentText(result.content);
   }
   return result;
+}
+
+// Auto dates describe the first publication, never draft creation or a guessed
+// photo capture date. Existing authored dates remain stable across republishing.
+export function publicationContent(kind, content, old = {}, now = new Date().toISOString()) {
+  if (kind === "stories" || content.dateMode !== "auto") return content;
+  const date = (old.dateMode === "auto" ? old.date : "") || calendarDateAt(old.publishedAt) || old.date ||
+    (old.published ? "" : calendarDateAt(now));
+  return { ...content, date };
 }
 
 export function validatePublication(
@@ -240,15 +322,20 @@ export function validatePublication(
   )
     fail("项目链接需要有效的http或https地址");
   if (kind === "stories") {
+    const precision = content.locationPrecision ?? "exact";
+    if (precision === "hidden") return;
+    if (precision === "city" && !content.publicLocation?.trim()) fail("发布前请填写公开城市名称");
+    const lat = precision === "city" ? content.cityLat : content.lat;
+    const lng = precision === "city" ? content.cityLng : content.lng;
     if (
-      !Number.isFinite(content.lat) ||
-      Math.abs(content.lat) > 90 ||
-      !Number.isFinite(content.lng) ||
-      Math.abs(content.lng) > 180
+      !Number.isFinite(lat) ||
+      Math.abs(lat) > 90 ||
+      !Number.isFinite(lng) ||
+      Math.abs(lng) > 180
     )
-      fail("发布前请选择有效的地点坐标");
+      fail(precision === "city" ? "发布前请选择城市代表坐标" : "发布前请选择有效的地点坐标");
     if (requireLocationConfirmation && !content.confirmLocation)
-      fail("发布前请确认这个精确位置可以公开");
+      fail(precision === "city" ? "发布前请确认城市代表位置可以公开" : "发布前请确认这个精确位置可以公开");
   }
 }
 
@@ -258,7 +345,22 @@ export function checkRevision(record, revision) {
   if (!Number.isSafeInteger(revision) || revision !== contentRevision(record))
     fail("文章已在其他窗口更新，请重新打开后再保存，当前内容未被覆盖", 409);
 }
-export function publicContent(record) {
+export function publicContent(record, kind) {
   const { draft, revision, draftSavedAt, confirmLocation, ...live } = record;
+  if (Array.isArray(live.photoDetails))
+    live.photoDetails = live.photoDetails.map(({ src, alt, caption, takenAt }) => ({ src, alt, caption, takenAt }));
+  if (kind === "stories" || own(record, "locationPrecision")) {
+    const precision = record.locationPrecision ?? "exact";
+    delete live.lat; delete live.lng; delete live.cityLat; delete live.cityLng;
+    delete live.location; delete live.city;
+    const label = record.publicLocation ?? (record.locationPrecision === undefined ? record.location : "");
+    if (label) live.location = label;
+    if (record.locationPrecision === undefined && record.city) live.city = record.city;
+    const lat = precision === "city" ? record.cityLat : record.lat;
+    const lng = precision === "city" ? record.cityLng : record.lng;
+    if (["exact", "city"].includes(precision) && Number.isFinite(lat) && Number.isFinite(lng)) {
+      live.lat = lat; live.lng = lng;
+    }
+  }
   return live;
 }

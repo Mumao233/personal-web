@@ -1,0 +1,136 @@
+.media-workbench,
+.story-location-fields {
+  border: 1px solid #ffffff20;
+  border-radius: 12px;
+  padding: 22px;
+  display: grid;
+  gap: 18px;
+  min-width: 0;
+}
+.media-section-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.media-section-title h2 {
+  margin: 0;
+}
+.media-section-title span {
+  font-size: 13px;
+  color: #aca8a2;
+}
+.media-photo-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+  gap: 18px;
+}
+.media-card {
+  border: 1px solid #ffffff20;
+  border-radius: 9px;
+  padding: 16px;
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  background: #10151acc;
+}
+.media-card > img {
+  width: 100%;
+  aspect-ratio: 4/3;
+  object-fit: contain;
+  background: #070a0d;
+  border-radius: 6px;
+}
+.media-card strong,
+.media-card a {
+  overflow-wrap: anywhere;
+}
+.media-card .check {
+  font-size: 13px;
+  align-items: flex-start;
+}
+.media-card progress {
+  width: 100%;
+  accent-color: #d8b28a;
+}
+.media-actions,
+.media-date-candidates {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+.media-actions button {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+}
+.media-date-candidates {
+  padding: 14px;
+  border-left: 2px solid #bc986c;
+}
+.media-date-candidates span,
+.media-date-candidates p {
+  flex-basis: 100%;
+  margin: 0;
+}
+.attachment-card {
+  margin: 0;
+}
+.location-external-notice {
+  font-size: 13px;
+  line-height: 1.7;
+  border-left: 2px solid #bc986c;
+  padding: 8px 14px;
+  color: #c7c1b8;
+}
+.location-candidate {
+  border: 1px solid #76634b;
+  border-radius: 8px;
+  padding: 16px;
+  display: grid;
+  gap: 10px;
+}
+.location-precision {
+  display: grid;
+  gap: 10px;
+}
+.location-precision label {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.location-precision input {
+  width: auto;
+}
+.story-location-fields .field-grid {
+  margin: 0;
+}
+.story-location-fields .place-result {
+  white-space: normal;
+  text-align: left;
+}
+.content-date-settings {
+  display: grid;
+  gap: 10px;
+}
+.content-date-settings .check input {
+  width: auto;
+}
+@media (max-width: 600px) {
+  .media-workbench,
+  .story-location-fields {
+    padding: 16px;
+  }
+  .media-photo-grid {
+    grid-template-columns: 1fr;
+  }
+  .attachment-card .field-grid {
+    grid-template-columns: 1fr;
+  }
+  .media-actions button {
+    flex: 1;
+    justify-content: center;
+  }
+}

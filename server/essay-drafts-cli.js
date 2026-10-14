@@ -53,8 +53,13 @@ async function inputFromStdin() {
   if (Object.keys(input).some((key) => key !== "revision" && !fields.has(key)))
     fail("仅接受 revision、title、body、content、excerpt、category、date");
   // Validate lengths/types before deriving structured plain text. Content is
-  // authoritative when both representations are explicitly supplied.
-  editableContent(input);
+  // authoritative when both representations are explicitly supplied. Date
+  // format validation needs the locked existing draft: legacy authored dates
+  // may be echoed unchanged, but new or changed dates must be calendar dates.
+  const { date, ...content } = input;
+  if (Object.hasOwn(input, "date") && (typeof date !== "string" || date.length > 40))
+    fail("date格式无效或过长");
+  editableContent(content);
   if (Object.hasOwn(input, "body") && !Object.hasOwn(input, "content")) {
     input.content = {
       type: "doc",
@@ -73,7 +78,7 @@ async function inputFromStdin() {
 }
 
 function draftView(record) {
-  const source = editableContent(record.draft || record);
+  const source = editableContent({}, record.draft || record, { kind: "posts" });
   return {
     id: record.id,
     revision: contentRevision(record),
@@ -150,22 +155,26 @@ try {
     if (!record || record.published) fail("未发布草稿不存在或不允许访问", 404);
     result = { draft: draftView(record) };
   } else {
-    const record = saveContentDraft(
-      store,
-      "posts",
-      operation === "create" ? "new" : id,
-      input,
-      { unpublishedOnly: true, dryRun },
-    );
-    result = dryRun
-      ? {
-          dryRun: true,
-          operation,
-          id: operation === "create" ? null : id,
-          revision: record.revision - 1,
-          nextRevision: record.revision,
-        }
-      : { draft: draftView(record) };
+    result = store.transaction(() => {
+      const record = saveContentDraft(
+        { ...store, transaction: callback => callback() },
+        "posts",
+        operation === "create" ? "new" : id,
+        input,
+        { unpublishedOnly: true, dryRun },
+      );
+      // Project the response before COMMIT, so a projection error cannot report
+      // failure after successfully persisting a revision the caller did not see.
+      return dryRun
+        ? {
+            dryRun: true,
+            operation,
+            id: operation === "create" ? null : id,
+            revision: record.revision - 1,
+            nextRevision: record.revision,
+          }
+        : { draft: draftView(record) };
+    });
   }
   console.log(JSON.stringify({ ok: true, kind: "posts", ...result }));
 } catch (error) {

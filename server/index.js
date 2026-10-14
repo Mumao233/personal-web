@@ -7,6 +7,7 @@ import {
   createHash,
 } from "node:crypto";
 import { resolve } from "node:path";
+import { readFile } from "node:fs/promises";
 import ExcelJS from "exceljs";
 import {
   list,
@@ -16,6 +17,7 @@ import {
   setting,
   setSetting,
   transaction,
+  dataDir,
 } from "./store.js";
 import {
   validateSurvey,
@@ -54,8 +56,14 @@ import {
   editableContent,
   publicContent,
   validatePublication,
+  publicationContent,
 } from "./content.js";
 import { saveContentDraft, transitionContent } from "./admin-content.js";
+import { publicSummary } from "./public-content.js";
+import { buildPublicPageMetadata, injectPageMetadata } from "./page-metadata.js";
+import { validateContentMedia } from "./media-processing.js";
+import { reverseLocationCandidate } from "./location-result.js";
+const contentStore = { get, put, transaction, validateContentMedia: (kind, content) => validateContentMedia(dataDir, kind, content) };
 const app = express();
 const port = Number(process.env.PORT || 5193);
 const atlas =
@@ -207,18 +215,19 @@ app.post("/api/logout", (req, res) => {
   res.clearCookie("space_session");
   res.json({ ok: true });
 });
-app.get("/api/public", (req, res) =>
-  res.json({
+function publicData({ summary = false } = {}) {
+  const project = (kind) => (record) => summary ? publicSummary(record, kind) : publicContent(record, kind);
+  return {
     profile: publicProfile(setting("profile")),
     projects: list("projects")
       .filter((x) => x.published)
-      .map(publicContent),
+      .map(project("projects")),
     posts: list("posts")
       .filter((x) => x.published)
-      .map(publicContent),
+      .map(project("posts")),
     stories: list("stories")
       .filter((x) => x.published)
-      .map(publicContent),
+      .map(project("stories")),
     surveys: list("surveys")
       .filter((x) => x.published)
       .map(({ questions, ...s }) => ({
@@ -228,8 +237,15 @@ app.get("/api/public", (req, res) =>
     messages: list("messages")
       .filter((x) => x.public && !x.hidden)
       .map(publicMessage),
-  }),
-);
+  };
+}
+app.get("/api/public", (req, res) => res.json(publicData({ summary: req.query.view === "summary" })));
+app.get("/api/content/:kind/:id", (req, res) => {
+  const { kind, id } = req.params;
+  const record = ["projects", "posts", "stories"].includes(kind) ? get(kind, id) : null;
+  if (!record?.published) return res.status(404).json({ error: "内容不存在或尚未发布" });
+  res.json(publicContent(record, kind));
+});
 app.post(
   "/api/questions",
   (req, res, next) => {
@@ -520,6 +536,7 @@ app.get(
     const lat = Number(req.query.lat),
       lng = Number(req.query.lng);
     if (
+      !String(req.query.lat ?? "").trim() || !String(req.query.lng ?? "").trim() ||
       !Number.isFinite(lat) ||
       !Number.isFinite(lng) ||
       Math.abs(lat) > 90 ||
@@ -535,13 +552,7 @@ app.get(
     );
     if (!r.ok) throw Error("地点服务暂时不可用");
     const d = await r.json();
-    res.json({
-      city:
-        d.address?.city || d.address?.town || d.address?.county || d.name || "",
-      cityLat: Number(d.lat) || lat,
-      cityLng: Number(d.lon) || lng,
-      location: d.display_name || "",
-    });
+    res.json(reverseLocationCandidate(d));
   }),
 );
 app.put("/api/admin/profile", (req, res, next) => {
@@ -591,7 +602,7 @@ for (const kind of ["projects", "posts", "stories"]) {
     try {
       res.json(
         saveContentDraft(
-          { get, put, transaction },
+          contentStore,
           kind,
           req.params.id,
           req.body,
@@ -604,7 +615,7 @@ for (const kind of ["projects", "posts", "stories"]) {
   app.post(`/api/admin/${kind}/:id/publish`, (req, res, next) => {
     try {
       const saved = transitionContent(
-        { get, put, transaction },
+        contentStore,
         kind,
         req.params.id,
         req.body,
@@ -618,7 +629,7 @@ for (const kind of ["projects", "posts", "stories"]) {
   app.post(`/api/admin/${kind}/:id/unpublish`, (req, res, next) => {
     try {
       const saved = transitionContent(
-        { get, put, transaction },
+        contentStore,
         kind,
         req.params.id,
         req.body,
@@ -639,7 +650,11 @@ for (const kind of ["projects", "posts", "stories", "surveys"]) {
         const saved = transaction(() => {
           const old = get(kind, id);
           if (b.revision !== undefined) checkRevision(old, b.revision);
-          const content = editableContent(b, old || {});
+          const now = new Date().toISOString();
+          const published = typeof b.published === "boolean" ? b.published : Boolean(old?.published);
+          let content = editableContent(b, old || {}, { kind, isNew: !old });
+          if (published) content = publicationContent(kind, content, old || {}, now);
+          validateContentMedia(dataDir, kind, content);
           validatePublication(kind, content, {
             requireLocationConfirmation:
               b.published === true ||
@@ -650,13 +665,11 @@ for (const kind of ["projects", "posts", "stories", "surveys"]) {
             ...previous,
             ...content,
             id,
-            published:
-              typeof b.published === "boolean"
-                ? b.published
-                : Boolean(old?.published),
+            published,
+            ...(old?.publishedAt ? { publishedAt: old.publishedAt } : published && !old?.published ? { publishedAt: now } : {}),
             revision: contentRevision(old) + 1,
-            createdAt: old?.createdAt || new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
+            createdAt: old?.createdAt || now,
+            updatedAt: now,
           });
         });
         return res.json(saved);
@@ -789,20 +802,39 @@ app.get(
   }),
 );
 registerMediaRoutes(app, auth);
+function pageHtml(html, req) {
+  return injectPageMetadata(html, buildPublicPageMetadata({
+    url: req.originalUrl,
+    origin: process.env.PUBLIC_SITE_ORIGIN || "https://mumao.site",
+    publicData: publicData({ summary: true }),
+  }));
+}
+const rejectFileRoute = (req, res) => {
+  if (/^\/api(?:\/|$)/i.test(req.path) || /\.[a-z0-9]+$/i.test(req.path)) {
+    res.status(404).json({ error: "页面或文件不存在" });
+    return true;
+  }
+  return false;
+};
 if (process.argv.includes("--production")) {
-  app.use(express.static(resolve("dist")));
+  const indexHtml = await readFile(resolve("dist/index.html"), "utf8");
+  app.use(express.static(resolve("dist"), { index: false }));
   app.get("/{*path}", (req, res) => {
-    if (req.path.startsWith("/api/") || /\.[a-z0-9]+$/i.test(req.path))
-      return res.status(404).json({ error: "页面或文件不存在" });
-    res.sendFile(resolve("dist/index.html"));
+    if (rejectFileRoute(req, res)) return;
+    res.set("Cache-Control", "no-store").type("html").send(pageHtml(indexHtml, req));
   });
 } else {
   const { createServer } = await import("vite");
   const vite = await createServer({
     server: { middlewareMode: true },
-    appType: "spa",
+    appType: "custom",
   });
   app.use(vite.middlewares);
+  app.get("/{*path}", asyncRoute(async (req, res) => {
+    if (rejectFileRoute(req, res)) return;
+    const html = pageHtml(await readFile(resolve("index.html"), "utf8"), req);
+    res.set("Cache-Control", "no-store").type("html").send(await vite.transformIndexHtml(req.originalUrl, html));
+  }));
 }
 app.use((err, req, res, next) => {
   res.status(err.status || 500).json({

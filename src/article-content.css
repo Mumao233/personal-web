@@ -33,12 +33,15 @@
   line-height: 1.95;
   margin: 22px 0 0;
 }
-.article-content > .article-cover {
+.article-cover-open {
+  margin: 0 0 38px;
+}
+.article-cover-open .article-cover {
   display: block;
   width: 100%;
   max-height: 620px;
   object-fit: contain;
-  margin: 0 0 38px;
+  margin: 0;
 }
 .rich-body {
   display: flow-root;
@@ -123,7 +126,8 @@
   margin: 8px 0 28px;
   break-inside: avoid;
 }
-.rich-image > a {
+.rich-image > a,
+.rich-image > button {
   display: block;
 }
 .rich-image img {
@@ -167,6 +171,17 @@
   height: auto;
   max-height: 480px;
   object-fit: contain;
+}
+.article-gallery .photo-grid figure {
+  margin: 0;
+  min-width: 0;
+}
+.article-gallery figcaption {
+  color: #b9a48b;
+  font-size: 12px;
+  margin-top: 8px;
+  line-height: 1.7;
+  white-space: pre-wrap;
 }
 .article-project-link {
   margin-top: 35px;

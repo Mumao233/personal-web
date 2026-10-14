@@ -15,6 +15,11 @@ import {
   List as MenuIcon,
 } from "@phosphor-icons/react";
 import { api, date } from "./api";
+import { contentDateValue } from "../shared/content-date.js";
+import {
+  buildPublicPageMetadata,
+  resolvePageRoute,
+} from "../shared/page-info.js";
 import { quotes } from "./quotes";
 import Survey from "./survey";
 import ArticleContent from "./article-content";
@@ -162,18 +167,111 @@ function App() {
     [error, setError] = useState(""),
     [menu, setMenu] = useState(false);
   const query = new URLSearchParams(location.search);
-  const detailKind = ["post", "project", "story"].find((key) => query.has(key));
-  const detailPage = { post: "notes", project: "projects", story: "world" }[
-    detailKind
-  ];
-  const page = query.get("page") || detailPage || "home";
-  const load = () =>
-    api("/public")
+  const route = resolvePageRoute(query);
+  const detailKind = route.collection ? route.type : null;
+  const detailPage = route.page;
+  const page = route.page;
+  const [detail, setDetail] = useState(null);
+  const [detailError, setDetailError] = useState(null);
+  const [detailLoading, setDetailLoading] = useState(!!route.collection);
+  const [detailAttempt, setDetailAttempt] = useState(0);
+  const load = () => {
+    setError("");
+    return api("/public?view=summary")
       .then(setData)
       .catch((e) => setError(e.message));
+  };
   useEffect(() => {
     load();
   }, []);
+  useEffect(() => {
+    if (!route.collection) return;
+    let cancelled = false;
+    setDetail(null);
+    setDetailError(null);
+    setDetailLoading(true);
+    api(`/content/${route.collection}/${encodeURIComponent(route.id || "")}`)
+      .then((value) => {
+        if (!cancelled) setDetail(value);
+      })
+      .catch((reason) => {
+        if (!cancelled) setDetailError(reason);
+      })
+      .finally(() => {
+        if (!cancelled) setDetailLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [route.collection, route.id, detailAttempt]);
+  useEffect(() => {
+    if (!data) return;
+    const publicData =
+      detail && route.collection
+        ? {
+            ...data,
+            [route.collection]: [
+              { ...detail, id: route.id },
+              ...(data[route.collection] || []).filter(
+                (item) => item.id !== route.id,
+              ),
+            ],
+          }
+        : data;
+    const canonicalOrigin = new URL(
+      document.head.querySelector('link[rel="canonical"]')?.href ||
+        location.origin,
+    ).origin;
+    const metadata = buildPublicPageMetadata({
+      url: location.href,
+      origin: canonicalOrigin,
+      publicData,
+    });
+    document.title = metadata.title;
+    const update = (selector, attributes) => {
+      let node = document.head.querySelector(selector);
+      if (!node) {
+        node = document.createElement(
+          selector.startsWith("link") ? "link" : "meta",
+        );
+        document.head.appendChild(node);
+      }
+      Object.entries(attributes).forEach(([key, value]) =>
+        node.setAttribute(key, value),
+      );
+    };
+    update('meta[name="description"]', {
+      name: "description",
+      content: metadata.description,
+    });
+    update('link[rel="canonical"]', {
+      rel: "canonical",
+      href: metadata.canonical,
+    });
+    for (const [key, value] of Object.entries({
+      title: metadata.title,
+      description: metadata.description,
+      url: metadata.canonical,
+      type: metadata.type,
+      site_name: metadata.siteName,
+    }))
+      update(`meta[property="og:${key}"]`, {
+        property: `og:${key}`,
+        content: value,
+      });
+    if (metadata.image)
+      update('meta[property="og:image"]', {
+        property: "og:image",
+        content: metadata.image,
+      });
+    else document.head.querySelector('meta[property="og:image"]')?.remove();
+    if (metadata.noindex)
+      update('meta[name="robots"]', {
+        name: "robots",
+        content: "noindex, nofollow",
+      });
+    else document.head.querySelector('meta[name="robots"]')?.remove();
+  }, [data, detail, page, route.id, route.type]);
   if (page === "admin")
     return (
       <ModuleBoundary label="管理空间">
@@ -190,25 +288,27 @@ function App() {
       </div>
     );
   const p = data.profile;
-  const detail = detailKind
-    ? data[
-        { post: "posts", project: "projects", story: "stories" }[detailKind]
-      ].find((item) => item.id === query.get(detailKind))
-    : null;
   return (
     <>
+      <a
+        className="skip-main"
+        href="#main-content"
+        onClick={() => document.getElementById("main-content")?.focus()}
+      >
+        跳到主要内容
+      </a>
       <Intro />
       <ModuleBoundary label="3D 场景" quiet>
-      <Suspense fallback={null}>
-        <Space
-          home={
-            page === "home" &&
-            !detailKind &&
-            !query.has("answer") &&
-            !query.has("survey")
-          }
-        />
-      </Suspense>
+        <Suspense fallback={null}>
+          <Space
+            home={
+              page === "home" &&
+              !detailKind &&
+              !query.has("answer") &&
+              !query.has("survey")
+            }
+          />
+        </Suspense>
       </ModuleBoundary>
       <div
         className={`site-content ${page === "home" && !detailKind ? "is-home" : ""}`}
@@ -226,10 +326,11 @@ function App() {
           >
             {menu ? <X /> : <MenuIcon />}
           </button>
-          <nav className={menu ? "open" : ""}>
+          <nav aria-label="主要导航" className={menu ? "open" : ""}>
             {nav.map(([key, label]) => (
               <a
                 className={page === key ? "active" : ""}
+                aria-current={page === key ? "page" : undefined}
                 key={key}
                 href={"/?page=" + key}
               >
@@ -238,18 +339,31 @@ function App() {
             ))}
           </nav>
         </header>
-        <main>
-          {query.has("answer") ? (
+        <main id="main-content" tabIndex={-1}>
+          {route.type === "answer" ? (
             <Answer token={query.get("answer")} />
-          ) : query.has("survey") ? (
+          ) : route.type === "survey" ? (
             <Survey id={query.get("survey")} />
           ) : detailKind ? (
             <div className="reading article-reading">
               <a className="back" href={"/?page=" + detailPage}>
                 <ArrowLeft /> 返回{nav.find(([key]) => key === detailPage)?.[1]}
               </a>
-              {detail ? (
-                <ArticleContent item={detail} />
+              {detailLoading ? (
+                <p role="status">正在读取完整内容…</p>
+              ) : detail ? (
+                <ArticleContent item={detail} kind={detailKind} />
+              ) : detailError && detailError.status !== 404 ? (
+                <section role="alert">
+                  <h1>暂时无法读取内容</h1>
+                  <p>{detailError.message}</p>
+                  <button
+                    type="button"
+                    onClick={() => setDetailAttempt((attempt) => attempt + 1)}
+                  >
+                    重新读取
+                  </button>
+                </section>
               ) : (
                 <section className="article-not-found">
                   <span className="eyebrow">ARTICLE NOT FOUND</span>
@@ -482,7 +596,7 @@ function App() {
                             <ArrowUpRight />
                           </div>
                           <h2>{x.title}</h2>
-                          <p>{x.body.slice(0, 85)}</p>
+                          <p>{x.excerpt || "打开查看完整项目"}</p>
                         </a>
                       ))}
                     </div>
@@ -508,10 +622,12 @@ function App() {
                         href={"/?page=notes&post=" + x.id}
                         key={x.id}
                       >
-                        <span className="mono">{date(x.createdAt)}</span>
+                        <span className="mono">
+                          {date(contentDateValue(x, "posts"))}
+                        </span>
                         <div>
                           <h2>{x.title}</h2>
-                          <p>{x.excerpt || x.body.slice(0, 100)}</p>
+                          <p>{x.excerpt || "打开阅读全文"}</p>
                         </div>
                         <ArrowUpRight />
                       </a>
@@ -532,11 +648,11 @@ function App() {
                     subtitle="用问题靠近世界，用照片留住片刻。"
                   />
                   <ModuleBoundary label="世界地图">
-                  <Suspense
-                    fallback={<div className="loading">正在展开地球…</div>}
-                  >
-                    <World stories={data.stories} />
-                  </Suspense>
+                    <Suspense
+                      fallback={<div className="loading">正在展开地球…</div>}
+                    >
+                      <World stories={data.stories} />
+                    </Suspense>
                   </ModuleBoundary>
                 </div>
               )}
@@ -640,7 +756,7 @@ export function Questions({ data, refresh }) {
     [uncertain, setUncertain] = useState(false);
   const attempt = useRef(null);
   const inflight = useRef(false);
-  const set = (k, v) => setB(previous => ({ ...previous, [k]: v }));
+  const set = (k, v) => setB((previous) => ({ ...previous, [k]: v }));
   async function submit(e) {
     e.preventDefault();
     if (inflight.current) return;
@@ -649,12 +765,15 @@ export function Questions({ data, refresh }) {
     setError("");
     try {
       attempt.current ||= { ...b, submissionKey: newSubmissionKey() };
-      setResult(await api("/questions", { method: "POST", body: attempt.current }));
+      setResult(
+        await api("/questions", { method: "POST", body: attempt.current }),
+      );
       setUncertain(false);
       refresh();
     } catch (e) {
       setError(e.message);
-      const unknown = !e.status || e.status >= 500 || e.status === 429 || e.status === 408;
+      const unknown =
+        !e.status || e.status >= 500 || e.status === 429 || e.status === 408;
       setUncertain(unknown);
       if (!unknown) attempt.current = null;
     } finally {
@@ -710,7 +829,7 @@ export function Questions({ data, refresh }) {
                 className="quiet"
                 onClick={() => {
                   setResult(null);
-                  setB(previous => ({ ...previous, question: "" }));
+                  setB((previous) => ({ ...previous, question: "" }));
                   attempt.current = null;
                 }}
               >
@@ -719,59 +838,66 @@ export function Questions({ data, refresh }) {
             </div>
           ) : (
             <form className="question-form" onSubmit={submit}>
-              <fieldset className="submission-fields" disabled={busy || uncertain}>
-              <label>
-                想对我说什么？
-                <textarea
-                  required
-                  maxLength={5000}
-                  rows={6}
-                  value={b.question}
-                  onChange={(e) => set("question", e.target.value)}
-                  placeholder="不必准备好一个完美的问题。"
-                />
-              </label>
-              <div className="form-options">
-                <label className="check">
-                  <input
-                    type="checkbox"
-                    checked={b.anonymous}
-                    onChange={(e) => set("anonymous", e.target.checked)}
-                  />
-                  匿名
-                </label>
-                <label className="check">
-                  <input
-                    type="checkbox"
-                    checked={b.public}
-                    onChange={(e) => set("public", e.target.checked)}
-                  />
-                  公开这条提问
-                </label>
-              </div>
-              {!b.anonymous && (
+              <fieldset
+                className="submission-fields"
+                disabled={busy || uncertain}
+              >
                 <label>
-                  你的署名
-                  <input
+                  想对我说什么？
+                  <textarea
                     required
-                    maxLength={80}
-                    value={b.name}
-                    onChange={(e) => set("name", e.target.value)}
-                    placeholder="你想使用的名字"
+                    maxLength={5000}
+                    rows={6}
+                    value={b.question}
+                    onChange={(e) => set("question", e.target.value)}
+                    placeholder="不必准备好一个完美的问题。"
                   />
                 </label>
-              )}
-              <label>
-                找回方式 <span className="optional">选填</span>
-                <input
-                  maxLength={320}
-                  value={b.recovery}
-                  onChange={(e) => set("recovery", e.target.value)}
-                  placeholder="邮箱、手机号，或至少8位私密字符串"
-                />
-              </label>
+                <div className="form-options">
+                  <label className="check">
+                    <input
+                      type="checkbox"
+                      checked={b.anonymous}
+                      onChange={(e) => set("anonymous", e.target.checked)}
+                    />
+                    匿名
+                  </label>
+                  <label className="check">
+                    <input
+                      type="checkbox"
+                      checked={b.public}
+                      onChange={(e) => set("public", e.target.checked)}
+                    />
+                    公开这条提问
+                  </label>
+                </div>
+                {!b.anonymous && (
+                  <label>
+                    你的署名
+                    <input
+                      required
+                      maxLength={80}
+                      value={b.name}
+                      onChange={(e) => set("name", e.target.value)}
+                      placeholder="你想使用的名字"
+                    />
+                  </label>
+                )}
+                <label>
+                  找回方式 <span className="optional">选填</span>
+                  <input
+                    maxLength={320}
+                    value={b.recovery}
+                    onChange={(e) => set("recovery", e.target.value)}
+                    placeholder="邮箱、手机号，或至少8位私密字符串"
+                  />
+                </label>
               </fieldset>
-              {uncertain && <p className="fine" role="status">提交结果尚未确认。请重试确认这一次提交，系统不会重复保存。</p>}
+              {uncertain && (
+                <p className="fine" role="status">
+                  提交结果尚未确认。请重试确认这一次提交，系统不会重复保存。
+                </p>
+              )}
               <p className="fine">
                 联系方式不会公开。收到回复后会发送通知；也可凭专属链接或私密字符串查看。
                 {b.public
@@ -791,9 +917,9 @@ export function Questions({ data, refresh }) {
                   ? "正在提交…"
                   : uncertain
                     ? "重试确认提交结果"
-                  : data.profile.acceptQuestions
-                    ? "把话留在这里"
-                    : "提问暂时关闭"}
+                    : data.profile.acceptQuestions
+                      ? "把话留在这里"
+                      : "提问暂时关闭"}
                 <ArrowUpRight />
               </button>
             </form>

@@ -72,6 +72,10 @@ export default function World({ stories = [], onPick, pick, compact = false }) {
               d.count > 1
                 ? (d.city || "附近地点") + " · " + d.count + "个记录"
                 : d.title;
+            b.setAttribute(
+              "aria-label",
+              `${d.city || d.location || d.title || "地图地点"}，${d.count || 1} 个记录${d.count === 1 && d.title ? `：${d.title}` : ""}`,
+            );
             b.onclick = () => {
               if (d.count > 1) {
                 g.pointOfView({ lat: d.lat, lng: d.lng, altitude: 0.35 }, 700);
@@ -202,6 +206,7 @@ export default function World({ stories = [], onPick, pick, compact = false }) {
           <button
             type="button"
             className={!flat ? "selected" : ""}
+            aria-pressed={!flat}
             onClick={() => setFlat(false)}
           >
             <GlobeHemisphereEast /> 地球
@@ -209,6 +214,7 @@ export default function World({ stories = [], onPick, pick, compact = false }) {
           <button
             type="button"
             className={flat ? "selected" : ""}
+            aria-pressed={flat}
             onClick={() => setFlat(true)}
           >
             <MapTrifold /> 平面地图
@@ -226,7 +232,7 @@ export default function World({ stories = [], onPick, pick, compact = false }) {
         <div className="flat-map">
           <svg
             viewBox="0 0 1000 500"
-            role="img"
+            role="group"
             aria-label="世界地图"
             onClick={(e) => {
               if (!onPick) return;
@@ -248,9 +254,9 @@ export default function World({ stories = [], onPick, pick, compact = false }) {
                   e.stopPropagation();
                   select(g);
                 }}
-                tabIndex="0"
+                tabIndex={0}
                 role="button"
-                aria-label={g.title}
+                aria-label={`${g.city || g.location || g.title || "地图地点"}，${g.count} 个记录${g.count === 1 && g.title ? `：${g.title}` : ""}`}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" || e.key === " ") {
                     e.preventDefault();
@@ -334,12 +340,12 @@ export default function World({ stories = [], onPick, pick, compact = false }) {
           {selected.items.map((s) => (
             <article className="story-entry" key={s.id}>
               <span className="eyebrow">
-                {s.location || s.city} / {date(s.date)}
+                {[s.location || s.city, date(s.date)]
+                  .filter(Boolean)
+                  .join(" / ")}
               </span>
               <h2>{s.title}</h2>
-              <p className="story-body">
-                {s.excerpt || String(s.body || "").slice(0, 120)}
-              </p>
+              <p className="story-body">{s.excerpt || "打开查看完整故事"}</p>
               <a
                 className="text-link"
                 href={`/?page=world&story=${encodeURIComponent(s.id)}`}
@@ -364,7 +370,9 @@ export default function World({ stories = [], onPick, pick, compact = false }) {
                 )}
                 <div>
                   <span className="eyebrow">
-                    {s.location} / {date(s.date)}
+                    {[s.location || s.city, date(s.date)]
+                      .filter(Boolean)
+                      .join(" / ")}
                   </span>
                   <h3>{s.title}</h3>
                 </div>

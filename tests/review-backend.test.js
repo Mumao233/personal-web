@@ -466,6 +466,7 @@ test("legacy publishing requires location consent and conflict recovery can read
   const body = {
     title: "Synthetic story",
     body: "Text",
+    locationPrecision: "exact",
     lat: 12,
     lng: 34,
     published: true,

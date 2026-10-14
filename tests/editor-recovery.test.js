@@ -476,8 +476,8 @@ test("out of order place responses cannot replace the current query results", as
   const a = deferred(),
     b = deferred();
   globalThis.fetch = async (url) => {
-    if (url === "/api/geocode?q=A") return a.promise;
-    if (url === "/api/geocode?q=B") return b.promise;
+    if (url === "/api/geocode?q=AA") return a.promise;
+    if (url === "/api/geocode?q=BB") return b.promise;
     if (url === "/assets/countries.json") return reply({ features: [] });
     throw Error(`Unexpected request ${url}`);
   };
@@ -490,10 +490,10 @@ test("out of order place responses cannot replace the current query results", as
       leaveEditor: { current: null },
     }),
   );
-  await input(field("搜索地址或景点"), "A");
-  await click(button("搜索地点"));
-  await input(field("搜索地址或景点"), "B");
-  await click(button("搜索地点"));
+  await input(field("搜索地址或城市"), "AA");
+  await click(button("向 Nominatim 查询此文字"));
+  await input(field("搜索地址或城市"), "BB");
+  await click(button("向 Nominatim 查询此文字"));
   await act(async () =>
     b.resolve(
       reply([{ display_name: "Current place B", lat: "23", lon: "113" }]),
@@ -501,7 +501,7 @@ test("out of order place responses cannot replace the current query results", as
   );
   assert.equal(
     container.querySelector(".place-result").textContent,
-    "Current place B",
+    "设为原始精确位置：Current place B",
   );
   await act(async () =>
     a.resolve(
@@ -510,7 +510,7 @@ test("out of order place responses cannot replace the current query results", as
   );
   assert.equal(
     container.querySelector(".place-result").textContent,
-    "Current place B",
+    "设为原始精确位置：Current place B",
   );
 });
 

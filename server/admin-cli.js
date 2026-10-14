@@ -7,10 +7,12 @@ import { pathToFileURL } from "node:url";
 import { fingerprint } from "./versions.js";
 import { decodeBase64 } from "./base64.js";
 import { adminGet, adminList, adminMutate } from "./admin-content.js";
+import { calendarDateAt } from "../shared/content-date.js";
 import {
   prepareMedia,
   savePreparedMedia,
   loadPreviewMedia,
+  validateContentMedia,
 } from "./media-processing.js";
 
 const fail = (message, status = 400, code = "INVALID_REQUEST") => {
@@ -90,10 +92,11 @@ function operationsFor(input) {
   return input;
 }
 
-function databaseStore(db, { overlay = false } = {}) {
+function databaseStore(db, { overlay = false, dataDir } = {}) {
   const records = new Map(),
     settings = new Map();
   return {
+    validateContentMedia: (kind, content) => validateContentMedia(dataDir, kind, content),
     get(kind, id) {
       const key = JSON.stringify([kind, id]);
       if (records.has(key)) return structuredClone(records.get(key));
@@ -153,6 +156,7 @@ function previewHash(operations, before, expiresAt) {
     operations,
     versions: before.map((view) => view?.version ?? null),
     expiresAt,
+    publicationDay: calendarDateAt(new Date().toISOString()),
   });
 }
 function changedKeys(before, after) {
@@ -213,7 +217,7 @@ export async function executeAdminRequest(dataDir, request) {
   let transaction = false,
     savedMedia;
   try {
-    const store = databaseStore(db);
+    const store = databaseStore(db, { dataDir });
     if (action === "media-get") {
       return {
         ok: true,
@@ -304,7 +308,7 @@ export async function executeAdminRequest(dataDir, request) {
       if (!result) {
         const before = stateBefore(store, operations);
         if (action === "preview") {
-          const simulation = databaseStore(db, { overlay: true });
+          const simulation = databaseStore(db, { overlay: true, dataDir });
           const views = operations.map((operation) =>
             adminMutate(simulation, operation),
           );

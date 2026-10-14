@@ -24,7 +24,8 @@ export function saveContentDraft(
       });
     checkRevision(old, input?.revision);
     const now = new Date().toISOString();
-    const draft = editableContent(input, old?.draft || old || {});
+    const draft = editableContent(input, old?.draft || old || {}, { kind, isNew });
+    store.validateContentMedia?.(kind, draft);
     const record = {
       ...(old || {
         id: randomUUID(),

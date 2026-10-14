@@ -1,6 +1,12 @@
-import React from "react";
+import React, { useState } from "react";
 import { ArrowUpRight } from "@phosphor-icons/react";
 import { date } from "./api";
+import { contentDateValue } from "../shared/content-date.js";
+import MediaViewer, {
+  articlePhotos,
+  imageKey,
+  ProjectAttachments,
+} from "./media-viewer.jsx";
 import "./article-content.css";
 
 function safeUrl(value, image = false) {
@@ -18,15 +24,6 @@ function safeUrl(value, image = false) {
   return "";
 }
 
-function imageKey(src) {
-  try {
-    return new URL(src, globalThis.location?.origin || "https://mumao.site")
-      .href;
-  } catch {
-    return src;
-  }
-}
-
 export function inlineImageSources(content) {
   const sources = new Set();
   function visit(node) {
@@ -40,10 +37,12 @@ export function inlineImageSources(content) {
   return sources;
 }
 
-function renderNode(node, key) {
+function renderNode(node, key, onImage, details) {
   if (!node || typeof node !== "object") return null;
   const children = Array.isArray(node.content)
-    ? node.content.map((child, i) => renderNode(child, `${key}-${i}`))
+    ? node.content.map((child, i) =>
+        renderNode(child, `${key}-${i}`, onImage, details),
+      )
     : null;
   switch (node.type) {
     case "doc":
@@ -102,7 +101,12 @@ function renderNode(node, key) {
     case "hardBreak":
       return <br key={key} />;
     case "image": {
-      const attrs = node.attrs || {};
+      const attrs = {
+        ...(details?.find(
+          (photo) => imageKey(photo.src) === imageKey(node.attrs?.src),
+        ) || {}),
+        ...node.attrs,
+      };
       const src = safeUrl(attrs.src, true);
       if (!src) return null;
       const width = [25, 50, 75, 100].includes(Number(attrs.width))
@@ -118,11 +122,11 @@ function renderNode(node, key) {
           className={`rich-image rich-image-${align}`}
           style={{ "--image-width": `${width}%` }}
         >
-          <a
-            href={src}
-            target="_blank"
-            rel="noopener noreferrer"
-            aria-label={`查看原图${attrs.alt ? `：${attrs.alt}` : ""}`}
+          <button
+            type="button"
+            className="photo-open"
+            onClick={() => onImage?.(src)}
+            aria-label={`查看照片${attrs.alt ? `：${attrs.alt}` : ""}`}
           >
             <img
               src={src}
@@ -130,7 +134,7 @@ function renderNode(node, key) {
               title={typeof attrs.title === "string" ? attrs.title : undefined}
               loading="lazy"
             />
-          </a>
+          </button>
           {typeof attrs.caption === "string" && attrs.caption && (
             <figcaption>{attrs.caption}</figcaption>
           )}
@@ -142,12 +146,12 @@ function renderNode(node, key) {
   }
 }
 
-export function RichBody({ content, body = "" }) {
+export function RichBody({ content, body = "", onImage, photoDetails }) {
   const hasDocument = content?.type === "doc" && Array.isArray(content.content);
   return (
     <div className="rich-body">
       {hasDocument
-        ? renderNode(content, "doc")
+        ? renderNode(content, "doc", onImage, photoDetails)
         : String(body || "")
             .split(/\r?\n\s*\r?\n/)
             .filter(Boolean)
@@ -156,8 +160,16 @@ export function RichBody({ content, body = "" }) {
   );
 }
 
-export default function ArticleContent({ item, preview = false }) {
+export default function ArticleContent({ item, preview = false, kind }) {
+  const [viewing, setViewing] = useState(null);
   if (!item) return null;
+  const images = articlePhotos(item);
+  const openImage = (src) => {
+    const index = images.findIndex(
+      (image) => imageKey(image.src) === imageKey(src),
+    );
+    if (index >= 0) setViewing(index);
+  };
   const inline = inlineImageSources(item.content);
   const cover = safeUrl(item.cover, true);
   const showCover = cover && !inline.has(imageKey(cover));
@@ -171,7 +183,11 @@ export default function ArticleContent({ item, preview = false }) {
     },
   );
   const link = safeUrl(item.link);
-  const publishedDate = date(item.date || item.createdAt);
+  const dateValue = contentDateValue(
+    item,
+    kind || (Array.isArray(item.photos) ? "stories" : "posts"),
+  );
+  const publishedDate = date(dateValue);
   const place = item.location || item.city;
   return (
     <article className={`article-content${preview ? " article-preview" : ""}`}>
@@ -180,45 +196,85 @@ export default function ArticleContent({ item, preview = false }) {
           <div className="article-meta">
             {item.category && <span>{item.category}</span>}
             {place && <span>{place}</span>}
-            {publishedDate && (
-              <time dateTime={item.date || item.createdAt}>
-                {publishedDate}
-              </time>
-            )}
+            {publishedDate && <time dateTime={dateValue}>{publishedDate}</time>}
           </div>
         )}
         <h1>{item.title || "未命名文章"}</h1>
         {item.excerpt && <p className="article-excerpt">{item.excerpt}</p>}
       </header>
       {showCover && (
-        <img
-          className="article-cover"
-          src={cover}
-          alt={item.title || "文章封面"}
-        />
+        <button
+          type="button"
+          className="photo-open article-cover-open"
+          onClick={() => openImage(cover)}
+          aria-label={`查看封面：${item.title || "文章封面"}`}
+        >
+          <img
+            className="article-cover"
+            src={cover}
+            alt={
+              images.find((image) => imageKey(image.src) === imageKey(cover))
+                ?.alt ||
+              item.title ||
+              "文章封面"
+            }
+          />
+        </button>
       )}
-      <RichBody content={item.content} body={item.body} />
+      <RichBody
+        content={item.content}
+        body={item.body}
+        onImage={openImage}
+        photoDetails={item.photoDetails}
+      />
       {photos.length > 0 && (
         <section className="article-gallery" aria-label="照片相册">
           <h2>镜头里的片刻</h2>
           <div className="photo-grid">
             {photos.map((photo, i) => (
-              <a
-                key={photo}
-                href={photo}
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label={`查看照片 ${i + 1}`}
-              >
-                <img
-                  src={photo}
-                  alt={`${item.title || "照片故事"} · ${i + 1}`}
-                  loading="lazy"
-                />
-              </a>
+              <figure key={photo}>
+                <button
+                  type="button"
+                  className="photo-open"
+                  onClick={() => openImage(photo)}
+                  aria-label={`查看照片 ${i + 1}`}
+                >
+                  <img
+                    src={photo}
+                    alt={
+                      images.find(
+                        (image) => imageKey(image.src) === imageKey(photo),
+                      )?.alt || `${item.title || "照片故事"} · ${i + 1}`
+                    }
+                    loading="lazy"
+                  />
+                </button>
+                {images.find((image) => imageKey(image.src) === imageKey(photo))
+                  ?.caption && (
+                  <figcaption>
+                    {
+                      images.find(
+                        (image) => imageKey(image.src) === imageKey(photo),
+                      ).caption
+                    }
+                  </figcaption>
+                )}
+              </figure>
             ))}
           </div>
         </section>
+      )}
+      {(kind === "project" ||
+        kind === "projects" ||
+        (!kind && item.attachments)) && (
+        <ProjectAttachments attachments={item.attachments} />
+      )}
+      {viewing !== null && (
+        <MediaViewer
+          images={images}
+          start={viewing}
+          onClose={() => setViewing(null)}
+        />
       )}
       {link && (
         <a

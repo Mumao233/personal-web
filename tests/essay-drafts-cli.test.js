@@ -197,6 +197,54 @@ test("create writes a private draft, preserves text paragraphs/date and returns 
   assert.equal(stored.draft.date, "2019-04-05");
 });
 
+test("legacy timestamp and freeform dates survive read, title-only update and unchanged round-trip", async () => {
+  const dir = await fixture();
+  const values = ["2024-02-29T16:30:00.000Z", "2020年春天"];
+  const db = connect(dir);
+  for (const [index, date] of values.entries()) {
+    const id = `legacy-date-${index}`;
+    db.prepare("INSERT INTO records VALUES('posts',?,?)").run(id, JSON.stringify({
+      id, published: false, revision: 1, title: "旧内容", body: "旧正文",
+      ...(index === 0 ? { date } : { draft: { title: "旧草稿", body: "旧正文", date } }),
+    }));
+  }
+  db.close();
+  const initial = snapshot(dir);
+  assert.equal((await call(dir, ["list"])).code, 0);
+  for (const [index, date] of values.entries()) {
+    const read = await call(dir, ["get", `legacy-date-${index}`]);
+    assert.equal(read.code, 0); assert.equal(read.data.draft.date, date);
+  }
+  assert.equal(snapshot(dir), initial, "legacy reads must not normalize stored dates");
+  for (const [index, date] of values.entries()) {
+    const id = `legacy-date-${index}`;
+    const titleOnly = await call(dir, ["update", id], { revision: 1, title: "已改标题" });
+    assert.equal(titleOnly.code, 0, titleOnly.stdout);
+    assert.equal(titleOnly.data.draft.date, date);
+    assert.equal(titleOnly.data.draft.revision, 2);
+    assert.equal(record(dir, id).draft.date, date);
+    const roundTrip = await call(dir, ["update", id], { revision: 2, title: "原样日期回传", date });
+    assert.equal(roundTrip.code, 0, roundTrip.stdout);
+    assert.equal(roundTrip.data.draft.date, date);
+    assert.equal(record(dir, id).revision, 3);
+    const beforeInvalid = snapshot(dir);
+    for (const invalidDate of ["2023-02-29", "改变后的自由日期", "2024-03-01T00:00:00Z", null, 123, "x".repeat(41)]) {
+      const rejected = await call(dir, ["update", id], { revision: 3, title: "不能写入", date: invalidDate });
+      assert.equal(rejected.code, 1);
+      assert.equal(rejected.data.status, 400);
+      assert.equal(snapshot(dir), beforeInvalid, "invalid changed date must leave all data unchanged");
+    }
+    const calendar = await call(dir, ["update", id], { revision: 3, date: "2024-02-29" });
+    assert.equal(calendar.code, 0); assert.equal(calendar.data.draft.date, "2024-02-29");
+  }
+  const beforeCreate = snapshot(dir);
+  for (const date of values) {
+    const rejected = await call(dir, ["create"], { revision: 0, title: "新文章", date });
+    assert.equal(rejected.code, 1); assert.equal(rejected.data.status, 400);
+  }
+  assert.equal(snapshot(dir), beforeCreate);
+});
+
 test("update changes only draft/revision metadata and body replaces an old rich document explicitly", async () => {
   const dir = await fixture(),
     before = record(dir, "private-post");

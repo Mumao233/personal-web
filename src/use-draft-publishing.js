@@ -69,7 +69,7 @@ export default function useDraftPublishing(kind, item, value, blocked) {
       await serialize(async () => {
         await persist(true);
         if (blockedRef.current)
-          throw new Error("图片尚未处理完成，请完成后再发布。");
+          throw new Error("图片或附件尚未处理完成，请完成后再发布。");
         const result = await api(
           `/admin/${kind}/${record.current.id}/${operation}`,
           {
@@ -102,7 +102,7 @@ export default function useDraftPublishing(kind, item, value, blocked) {
     if (blocked || action) {
       setError(
         blocked
-          ? "图片正在上传或尚未处理完成，请完成后再离开。"
+          ? "图片或附件正在上传或尚未处理完成，请完成后再离开。"
           : "正在发布，请稍候。",
       );
       return false;

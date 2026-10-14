@@ -214,7 +214,7 @@ test("article publication reuses project URL and story exact location confirmati
   const story = adminMutate(store, {
     action: "create",
     kind: "stories",
-    data: { title: "照片", lat: 23, lng: 113 },
+    data: { title: "照片", locationPrecision: "exact", lat: 23, lng: 113 },
   });
   fails(() => mutation(store, story, "publish"));
   const confirmed = mutation(store, story, "update", { confirmLocation: true });

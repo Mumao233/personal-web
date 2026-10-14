@@ -17,6 +17,7 @@ import Image from "@tiptap/extension-image";
 import Link from "@tiptap/extension-link";
 import { NodeSelection, Plugin, PluginKey } from "@tiptap/pm/state";
 import "./rich-editor.css";
+import { uploadMedia } from "./media-upload";
 
 const uploadAnchors = new PluginKey("richImageUploadAnchors");
 const UploadAnchors = Extension.create({
@@ -115,47 +116,7 @@ function initialDocument(content, body) {
 }
 
 function uploadImage(file, onProgress, onRequest) {
-  return new Promise((resolve, reject) => {
-    const request = new XMLHttpRequest();
-    onRequest(request);
-    request.open("POST", "/api/admin/upload");
-    request.responseType = "json";
-    request.timeout = 120000;
-    request.upload.onprogress = (event) => {
-      if (event.lengthComputable)
-        onProgress(Math.round((event.loaded / event.total) * 100));
-    };
-    request.onload = () => {
-      if (request.status < 200 || request.status >= 300) {
-        reject(
-          new Error(
-            request.response?.error ||
-              `图片上传失败（${request.status}），请重试`,
-          ),
-        );
-        return;
-      }
-      const src = request.response?.files?.[0]?.url;
-      if (!src)
-        reject(new Error("服务器未接收此图片，请使用 JPG、PNG、WebP 或 GIF"));
-      else resolve(src);
-    };
-    request.onerror = () => reject(new Error("网络连接中断，请重试"));
-    request.ontimeout = () => reject(new Error("图片上传超时，请重试"));
-    request.onabort = () => reject(new Error("上传已取消"));
-    const data = new FormData();
-    const extensions = {
-      "image/jpeg": "jpg",
-      "image/png": "png",
-      "image/webp": "webp",
-      "image/gif": "gif",
-    };
-    const filename = /\.(jpe?g|png|webp|gif)$/i.test(file.name)
-      ? file.name
-      : `image-${Date.now()}.${extensions[file.type] || "png"}`;
-    data.append("files", file, filename);
-    request.send(data);
-  });
+  return uploadMedia(file, onProgress, onRequest).then((result) => result.url);
 }
 
 function ToolButton({ active, children, label, onClick, ...props }) {

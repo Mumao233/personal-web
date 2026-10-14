@@ -267,6 +267,7 @@ test("each content kind keeps its live version until publish and rejects stale s
     const detail =
       kind === "stories"
         ? {
+            locationPrecision: "exact",
             lat: 23,
             lng: 113,
             confirmLocation: true,
@@ -450,6 +451,7 @@ test("null documents are rejected without altering saved content and an empty do
 test("legacy plain text and media survive editing, and deleted drafts cannot be revived by a stale request", async () => {
   const legacy = await call("/admin/stories/new", "PUT", {
     title: "Old story",
+    locationPrecision: "exact",
     confirmLocation: true,
     body: "Old plain text\n\nSecond paragraph",
     photos: ["/uploads/old.jpg"],

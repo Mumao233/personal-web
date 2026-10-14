@@ -32,11 +32,4 @@ export async function api(path, options = {}) {
   }
   return data;
 }
-export const date = (v) =>
-  v
-    ? new Date(v).toLocaleDateString("zh-CN", {
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-      })
-    : "";
+export { formatContentDate as date } from "../shared/content-date.js";

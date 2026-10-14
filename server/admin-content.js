@@ -5,6 +5,7 @@ import {
   checkRevision,
   contentRevision,
   editableContent,
+  publicationContent,
   validatePublication,
 } from "./content.js";
 import { saveContentDraft } from "./content-drafts.js";
@@ -28,14 +29,17 @@ const common = [
   "excerpt",
   "category",
   "date",
+  "dateMode",
   "cover",
 ];
 const fields = {
   posts: common,
-  projects: [...common, "link", "status"],
+  projects: [...common, "link", "status", "attachments"],
   stories: [
     ...common,
     "location",
+    "locationPrecision",
+    "publicLocation",
     "city",
     "lat",
     "lng",
@@ -43,6 +47,7 @@ const fields = {
     "cityLng",
     "confirmLocation",
     "photos",
+    "photoDetails",
   ],
   profile: [
     "name",
@@ -277,9 +282,9 @@ function projectData(kind, value) {
     return profileData(pick(value, fields.profile), {}, { strict: false });
   if (kind === "surveys")
     return surveyData(pick(value, fields.surveys), {}, { strict: false });
-  return pick(editableContent(pick(value, fields[kind])), fields[kind]);
+  return pick(editableContent({}, pick(value, fields[kind]), { kind }), fields[kind]);
 }
-function normalizedData(kind, input, base) {
+function normalizedData(kind, input, base, isNew = false) {
   keysOnly(input, fields[kind], "内容");
   if (kind === "profile") return profileData(input, base);
   if (kind === "surveys") return surveyData(input, base);
@@ -304,7 +309,7 @@ function normalizedData(kind, input, base) {
       },
     };
   }
-  return pick(editableContent(content, base), fields[kind]);
+  return pick(editableContent(content, base, { kind, isNew }), fields[kind]);
 }
 function source(store, kind, id) {
   const live =
@@ -366,14 +371,15 @@ export function transitionContent(store, kind, id, input, action) {
         revision: contentRevision(old) + 1,
         updatedAt: now,
       });
-    const content = editableContent(old.draft || old);
+    const content = publicationContent(kind, editableContent({}, old.draft || old, { kind }), old, now);
+    store.validateContentMedia?.(kind, content);
     validatePublication(kind, content);
     const { draft, draftSavedAt, ...live } = old;
     return store.put(kind, {
       ...live,
       ...content,
       published: true,
-      publishedAt: old.publishedAt || now,
+      ...(old.publishedAt ? { publishedAt: old.publishedAt } : !old.published ? { publishedAt: now } : {}),
       updatedAt: now,
       revision: contentRevision(old) + 1,
     });
@@ -475,7 +481,7 @@ export function adminMutate(store, operation) {
               terminationMessage: "感谢你的参与，本次问卷到这里结束。",
             }
           : {});
-      const data = normalizedData(kind, operation.data ?? {}, base);
+      const data = normalizedData(kind, operation.data ?? {}, base, action === "create");
       if (
         kind === "profile" &&
         ["intro", "bio"].some((key) => data[key] !== view.live[key]) &&

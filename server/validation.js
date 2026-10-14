@@ -168,6 +168,31 @@ export function visibleQuestions(survey, answers) {
   return surveyFlow(survey, answers).questions;
 }
 
+// Completion measures valid required answers, never the section currently open.
+// Matrix rows are individual items so a partially answered matrix is represented.
+export function surveyAnswerProgress(survey, answers = {}) {
+  const { questions, termination } = surveyFlow(survey, answers);
+  let total = 0;
+  let answered = 0;
+  for (const question of questions) {
+    if (!question.required) continue;
+    if (question.type === "matrix") {
+      for (const row of question.rows || []) {
+        total++;
+        const value = answers?.[question.id];
+        if (object(value) && Object.keys(value).every((id) => question.rows.some((r) => r.id === id)) && own(value, row.id) &&
+            !answerError({ ...question, rows: [row] }, {
+              [question.id]: { [row.id]: value[row.id] },
+            })) answered++;
+      }
+    } else {
+      total++;
+      if (!answerError(question, answers)) answered++;
+    }
+  }
+  return { total, answered, percent: total ? Math.floor(answered / total * 100) : 0, terminated: Boolean(termination) };
+}
+
 export function validateSurvey(survey) {
   if (
     !object(survey) ||

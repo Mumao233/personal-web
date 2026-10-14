@@ -2,6 +2,7 @@ import { mkdir, writeFile, rm } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { randomUUID } from "node:crypto";
 import { decodeBase64 } from "../server/base64.js";
+import { publicContent } from "../server/content.js";
 
 const ORIGIN = "https://mumao.site";
 const labels = {
@@ -199,7 +200,8 @@ const paragraphs = (text) =>
     .split(/\n{2,}/)
     .map((value) => `<p>${escapeHtml(value).replace(/\n/g, "<br>")}</p>`)
     .join("");
-function article(value, files) {
+function article(source, files, kind) {
+  const value = publicContent(source, kind);
   const body =
     value.content?.type === "doc"
       ? documentHtml(value.content, files)
@@ -210,7 +212,10 @@ function article(value, files) {
   const cover = value.cover ? picture(value.cover, { alt: "封面" }, files) : "";
   const photos = (Array.isArray(value.photos) ? value.photos : [])
     .filter((photo) => !inBody.has(uploadName(photo)))
-    .map((photo) => picture(photo, {}, files))
+    .map((photo) => {
+      const detail = value.photoDetails?.find(item => item.src === photo) || {};
+      return picture(photo, { ...detail, caption: [detail.caption, detail.takenAt].filter(Boolean).join(" · ") }, files);
+    })
     .join("");
   const details = [
     value.date,
@@ -222,7 +227,10 @@ function article(value, files) {
     .filter(Boolean)
     .map(escapeHtml)
     .join(" · ");
-  return `<h2>${escapeHtml(value.title || "未命名")}</h2>${details ? `<p class="metadata">${details}</p>` : ""}${value.excerpt ? `<p class="excerpt">${escapeHtml(value.excerpt)}</p>` : ""}${cover}<div class="body">${body}</div>${value.link ? `<p>项目入口：${link(value.link, value.link, files)}</p>` : ""}${photos ? `<section class="album"><h3>相册</h3>${photos}</section>` : ""}${value.lat != null || value.lng != null ? `<p class="metadata">公开位置：${escapeHtml(value.lat)}, ${escapeHtml(value.lng)}；精确位置确认：${value.confirmLocation === true ? "已确认" : "未确认"}</p>` : ""}${value.cityLat != null || value.cityLng != null ? `<p class="metadata">城市中心：${escapeHtml(value.cityLat)}, ${escapeHtml(value.cityLng)}</p>` : ""}`;
+  const attachments = (value.attachments || []).map(item =>
+    `<li>${link(item.src, item.name, files)} · ${escapeHtml(item.size)} 字节${item.version ? ` · ${escapeHtml(item.version)}` : ""}${item.date ? ` · ${escapeHtml(item.date)}` : ""}</li>`).join("");
+  const privateDetails = kind === "stories" ? `<details class="private-metadata"><summary>后台私有拍摄资料（不会出现在公开阅读页）</summary><p>位置模式：${escapeHtml(source.locationPrecision || "exact（旧记录）")}</p><p>原始地点：${escapeHtml(source.location || "未记录")}；原始坐标：${escapeHtml(source.lat ?? "未知")}, ${escapeHtml(source.lng ?? "未知")}</p>${(source.photoDetails || []).map(item => `<p>${escapeHtml(item.src)}：拍摄坐标 ${escapeHtml(item.lat ?? "未知")}, ${escapeHtml(item.lng ?? "未知")}</p>`).join("")}</details>` : "";
+  return `<section class="public-article"><h2>${escapeHtml(value.title || "未命名")}</h2>${details ? `<p class="metadata">${details}</p>` : ""}${!value.date && value.dateMode === "auto" && kind !== "stories" ? '<p class="metadata">日期：首次发布时自动填写上海日期</p>' : ""}${value.excerpt ? `<p class="excerpt">${escapeHtml(value.excerpt)}</p>` : ""}${cover}<div class="body">${body}</div>${value.link ? `<p>项目入口：${link(value.link, value.link, files)}</p>` : ""}${photos ? `<section class="album"><h3>相册</h3>${photos}</section>` : ""}${attachments ? `<section><h3>PDF附件</h3><ul>${attachments}</ul></section>` : ""}${value.lat != null || value.lng != null ? `<p class="metadata">公开位置：${escapeHtml(value.lat)}, ${escapeHtml(value.lng)}</p>` : kind === "stories" ? '<p class="metadata">不公开地图坐标</p>' : ""}</section>${privateDetails}`;
 }
 
 function profile(value, files) {
@@ -304,7 +312,7 @@ function content(kind, value, files) {
     ? profile(value, files)
     : kind === "surveys"
       ? survey(value)
-      : article(value, files);
+      : article(value, files, kind);
 }
 
 export function renderPreview(preview, files = {}) {

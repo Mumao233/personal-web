@@ -1,8 +1,9 @@
 import sharp from "sharp";
 import { createHash, randomUUID } from "node:crypto";
-import { constants } from "node:fs";
+import { constants, closeSync, fstatSync, lstatSync, openSync, readSync, realpathSync } from "node:fs";
 import { basename, extname, isAbsolute, resolve } from "node:path";
 import { link, lstat, mkdir, open, readFile, realpath, unlink } from "node:fs/promises";
+import { safeArticleAttachment } from "./content.js";
 
 export const MAX_MEDIA_BYTES = 15 * 1024 * 1024;
 export const MAX_MEDIA_FILES = 20;
@@ -60,12 +61,52 @@ export async function prepareMedia(files) {
       clean = { buffer: Buffer.from(buffer), extension: ".pdf" };
     } else clean = await sanitizeImage(buffer);
     checkBytes(clean.buffer);
-    prepared.push({ name, ...clean });
+    prepared.push({ name, ...clean, size: clean.buffer.length, type: mediaType(clean.extension) });
   }
   return prepared;
 }
 
 const samePath = (a, b) => process.platform === "win32" ? a.toLowerCase() === b.toLowerCase() : a === b;
+const mediaType = extension => extension === ".pdf" ? "application/pdf" : `image/${extension === ".jpg" ? "jpeg" : extension.slice(1)}`;
+
+// Called synchronously inside the existing SQLite write transaction. This checks
+// only project PDF attachments, preserving the existing legacy image workflow.
+export function validateContentMedia(dataDir, kind, content) {
+  if (!content.attachments?.length) return;
+  if (kind !== "projects" || !Array.isArray(content.attachments) || content.attachments.length > 20)
+    throw failure("PDF附件格式无效");
+  if (typeof dataDir !== "string" || !isAbsolute(dataDir)) throw failure("媒体数据目录必须为绝对路径");
+  try {
+    const root = resolve(dataDir), uploads = resolve(root, "uploads");
+    for (const directory of [root, uploads]) {
+      const info = lstatSync(directory);
+      if (!info.isDirectory() || info.isSymbolicLink()) throw failure("媒体目录不可用");
+    }
+    if (!samePath(realpathSync(uploads), resolve(realpathSync(root), "uploads")))
+      throw failure("媒体目录不能使用符号链接");
+    for (const attachment of content.attachments) {
+      if (!safeArticleAttachment(attachment?.src)) throw failure("附件必须使用本站已上传的PDF");
+      const path = resolve(uploads, attachment.src.slice("/uploads/".length));
+      const before = lstatSync(path);
+      if (!before.isFile() || before.isSymbolicLink()) throw failure("PDF附件必须是普通文件");
+      const fd = openSync(path, constants.O_RDONLY | (constants.O_NOFOLLOW || 0));
+      try {
+        const info = fstatSync(fd);
+        if (!info.isFile() || info.ino !== before.ino || info.dev !== before.dev)
+          throw failure("PDF附件已变化，请重新上传", 409);
+        if (info.size < 5 || info.size > MAX_MEDIA_BYTES || info.size !== attachment.size)
+          throw failure("PDF附件实际大小与记录不一致，请重新上传");
+        const header = Buffer.alloc(5);
+        if (readSync(fd, header, 0, 5, 0) !== 5 || !header.equals(Buffer.from("%PDF-")))
+          throw failure("PDF附件文件内容无效");
+      } finally { closeSync(fd); }
+    }
+  } catch (error) {
+    if (error.status) throw error;
+    if (error.code === "ENOENT") throw failure("PDF附件不存在，请先上传后再保存");
+    throw failure("PDF附件不可读取，请重新上传");
+  }
+}
 async function checkedDirectory(path, create) {
   if (create) await mkdir(path, { recursive: true, mode: 0o700 });
   const info = await lstat(path);
@@ -166,7 +207,7 @@ export async function savePreparedMedia(dataDir, prepared, { operationId } = {})
         const cleanCopy = mediaCachePath(cache, name, await lstat(destination));
         if (await writeNew(cleanCopy, file.buffer)) created.push(cleanCopy);
       }
-      files.push({ url: "/uploads/" + name, name: file.name });
+      files.push({ url: "/uploads/" + name, name: file.name, size: file.buffer.length, type: mediaType(file.extension) });
     }
     return { files, rollback };
   } catch (error) { await rollback(); throw error; }
