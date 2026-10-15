@@ -392,6 +392,32 @@ test("survey direct save invalidates an assistant draft even if revision was not
   fails(() => mutation(store, latest, "publish"), 409);
 });
 
+test("assistant survey publication uses normalized options and blocks unsafe historical mappings atomically", (t) => {
+  const { store } = fixture(t);
+  const old = store.get("surveys", "survey-old");
+  const response = { id: "history", surveyId: old.id, questions: old.questions, answers: { q1: "甲" } };
+  store.put("submissions", response);
+  const raw = mutation(store, adminGet(store, "surveys", old.id), "update", {
+    questions: [{ ...question(), options: ["", "甲", "  ", "乙", ""] }],
+  });
+  assert.deepEqual(raw.draft.questions[0].options, ["甲", "乙"]);
+  const normalized = mutation(store, raw, "publish");
+  assert.deepEqual(store.get("surveys", old.id).questions[0].options, ["甲", "乙"]);
+  const liveBefore = structuredClone(store.get("surveys", old.id));
+  const unsafe = mutation(store, normalized, "update", {
+    questions: [{ ...question(), options: ["改名", "乙"] }],
+  });
+  assert.throws(() => mutation(store, unsafe, "publish"), (error) => {
+    assert.equal(error.code, "SURVEY_VALIDATION_FAILED");
+    assert.ok(error.issues.some((issue) => issue.questionId === "q1" && issue.code === "historical_option_removed"));
+    return true;
+  });
+  assert.deepEqual(store.get("surveys", old.id), liveBefore);
+  assert.deepEqual(store.get("submissions", response.id), response);
+  assert.equal(adminGet(store, "surveys", old.id).hasDraft, true);
+  assert.deepEqual(adminGet(store, "surveys", old.id).draft.questions[0].options, ["改名", "乙"]);
+});
+
 test("structured survey/profile input rejects nested injections and malformed values", (t) => {
   const { store } = fixture(t);
   for (const data of [

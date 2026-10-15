@@ -28,6 +28,7 @@ export async function api(path, options = {}) {
     const error = new Error(data?.error || "操作失败，请稍后重试");
     error.status = r.status;
     error.code = data?.code;
+    if (Array.isArray(data?.issues)) error.issues = data.issues;
     throw error;
   }
   return data;

@@ -27,6 +27,12 @@ import StoryLocationFields from "./story-location-fields";
 import { storyPublicationProblem } from "./media-workbench-state";
 import { publicContent } from "../server/content.js";
 import { calendarDateAt } from "../shared/content-date.js";
+import { surveyVisitUrl } from "../shared/page-info.js";
+import {
+  normalizeSurveyDefinition,
+  surveyDefinitionIssues,
+  splitOptionLines,
+} from "../shared/survey-definition.js";
 import {
   exclusiveOptionsFor,
   summarizeSurvey,
@@ -116,34 +122,6 @@ const questionOptions = (question) => [
     ...(question.allowOther ? ["其他"] : []),
   ]),
 ];
-function cleanQuestionRules(questions) {
-  return questions.map((question, index) => {
-    const options = questionOptions(question);
-    const source = questions
-      .slice(0, index)
-      .find((candidate) => candidate.id === question.condition?.questionId);
-    const conditionValid =
-      source &&
-      choiceTypes.includes(source.type) &&
-      (!question.condition.value ||
-        questionOptions(source).includes(question.condition.value));
-    return {
-      ...question,
-      terminateOptions: terminatingTypes.includes(question.type)
-        ? (question.terminateOptions || []).filter((option) =>
-            options.includes(option),
-          )
-        : [],
-      exclusiveOptions: exclusiveTypes.includes(question.type)
-        ? (question.exclusiveOptions || []).filter((option) =>
-            options.includes(option),
-          )
-        : [],
-      condition:
-        question.condition && conditionValid ? question.condition : null,
-    };
-  });
-}
 function newMatrixQuestion(example = false) {
   const statements = example
     ? [
@@ -186,16 +164,54 @@ function Field({ label, value, onChange, type = "text", ...props }) {
     </label>
   );
 }
-function Toggle({ label, value, onChange }) {
+function Toggle({ label, value, onChange, ...props }) {
   return (
     <label className="check">
       <input
         type="checkbox"
         checked={!!value}
         onChange={(e) => onChange(e.target.checked)}
+        {...props}
       />
       {label}
     </label>
+  );
+}
+export function SurveyLinks({ id }) {
+  const [message, setMessage] = useState("");
+  const [fallback, setFallback] = useState("");
+  async function copy(standalone) {
+    const link = new URL(surveyVisitUrl(id, standalone), window.location.origin)
+      .href;
+    try {
+      await navigator.clipboard.writeText(link);
+      setFallback("");
+      setMessage(standalone ? "已复制独立填写链接" : "已复制普通访问链接");
+    } catch {
+      setFallback(link);
+      setMessage("未能自动复制，请选择下方链接后复制。");
+    }
+  }
+  return (
+    <div className="survey-share-links">
+      <div>
+        <button type="button" onClick={() => copy(false)}>
+          复制普通访问链接
+        </button>
+        <button type="button" onClick={() => copy(true)}>
+          复制独立填写链接
+        </button>
+      </div>
+      {message && <p role="status">{message}</p>}
+      {fallback && (
+        <input
+          aria-label="待复制的问卷链接"
+          readOnly
+          value={fallback}
+          onFocus={(event) => event.target.select()}
+        />
+      )}
+    </div>
   );
 }
 export default function Admin() {
@@ -431,6 +447,7 @@ export default function Admin() {
                       <p>
                         {date(x.draftSavedAt || x.updatedAt || x.createdAt)}
                       </p>
+                      {tab === "surveys" && <SurveyLinks id={x.id} />}
                     </div>
                     <div className="row-actions">
                       <button onClick={() => setEditor(x)}>编辑</button>
@@ -737,18 +754,74 @@ export function ContentEditor({ kind, item, save, close, busy, leaveEditor }) {
   );
   const [surveySaving, setSurveySaving] = useState(false);
   const [surveyConflict, setSurveyConflict] = useState(false);
+  const [surveyIssues, setSurveyIssues] = useState([]);
+  const surveyChecked = useRef(false);
+  const formRef = useRef(null);
   const [reloading, setReloading] = useState(false);
   const [editorEpoch, setEditorEpoch] = useState(0);
   const surveySaved = useRef(JSON.stringify(b));
   const saveLock = useRef(false);
+  useEffect(() => {
+    if (kind !== "surveys") return;
+    setPreview(false);
+    if (surveyChecked.current)
+      setSurveyIssues(surveyDefinitionIssues(normalizeSurveyDefinition(b)));
+  }, [b, kind]);
+  function focusSurveyIssue(issue) {
+    const form = formRef.current;
+    if (!form) return;
+    const question = [...form.querySelectorAll("[data-question-id]")].find(
+      (node) => node.dataset.questionId === issue.questionId,
+    );
+    const scope = question || form;
+    const field = String(issue.field || "questions").split(/[.[]/)[0];
+    const marker = [...scope.querySelectorAll("[data-survey-field]")].find(
+      (node) =>
+        node.dataset.surveyField ===
+        (question ? field : issue.questionId ? "questions" : field),
+    );
+    const rowField =
+      field === "rows" && Number.isInteger(issue.rowIndex)
+        ? scope.querySelector(`[data-survey-row-index="${issue.rowIndex}"]`)
+        : null;
+    const target =
+      rowField ||
+      (marker?.matches("input, textarea, select, button, [tabindex]")
+        ? marker
+        : marker?.querySelector("input, textarea, select, button") ||
+          question?.querySelector("input, textarea, select") ||
+          form);
+    for (let node = target; node && node !== form; node = node.parentElement)
+      if (node.tagName === "DETAILS") node.open = true;
+    target.scrollIntoView?.({ block: "center", behavior: "instant" });
+    target.focus({ preventScroll: true });
+  }
+  function checkedSurvey() {
+    const normalized = normalizeSurveyDefinition(b);
+    const issues = surveyDefinitionIssues(normalized);
+    surveyChecked.current = true;
+    setSurveyIssues(issues);
+    if (issues.length) {
+      setPreview(false);
+      setError("");
+      return null;
+    }
+    return normalized;
+  }
+  function toggleSurveyPreview() {
+    if (preview) setPreview(false);
+    else if (checkedSurvey()) setPreview(true);
+  }
   async function saveSurvey() {
     if (saveLock.current || surveyConflict) return false;
+    const normalized = checkedSurvey();
+    if (!normalized) return false;
     saveLock.current = true;
     setSurveySaving(true);
     setError("");
     try {
       const result = await save({
-        ...b,
+        ...normalized,
         revision: b.revision || 0,
         startsAt: b.startsAt ? new Date(b.startsAt).toISOString() : "",
         endsAt: b.endsAt ? new Date(b.endsAt).toISOString() : "",
@@ -758,6 +831,7 @@ export function ContentEditor({ kind, item, save, close, busy, leaveEditor }) {
       return true;
     } catch (error) {
       setError(error.message);
+      if (Array.isArray(error.issues)) setSurveyIssues(error.issues);
       setSurveyConflict(isRevisionConflict(error));
       return false;
     } finally {
@@ -799,6 +873,8 @@ export function ContentEditor({ kind, item, save, close, busy, leaveEditor }) {
       if (kind === "surveys") {
         surveySaved.current = JSON.stringify(snapshot);
         setSurveyConflict(false);
+        setSurveyIssues([]);
+        surveyChecked.current = false;
       } else publisher.reset(record, snapshot);
       setB(snapshot);
       setEditorEpoch((epoch) => epoch + 1);
@@ -811,88 +887,79 @@ export function ContentEditor({ kind, item, save, close, busy, leaveEditor }) {
   const set = (k, v) =>
     setB((prev) => ({
       ...prev,
-      [k]: k === "questions" ? cleanQuestionRules(v) : v,
+      [k]: v,
     }));
   const updateQ = (i, key, v) =>
     setB((prev) => ({
       ...prev,
-      questions: cleanQuestionRules(
-        prev.questions.map((q, j) => (i === j ? { ...q, [key]: v } : q)),
+      questions: prev.questions.map((q, j) =>
+        i === j ? { ...q, [key]: v } : q,
       ),
     }));
   function changeQuestionType(index, type) {
     setB((prev) => ({
       ...prev,
-      questions: cleanQuestionRules(
-        prev.questions.map((question, i) => {
-          if (i !== index || question.type === type) return question;
-          return {
-            ...question,
-            type,
-            options:
-              type === "matrix"
-                ? [...likertOptions]
-                : question.type === "text"
-                  ? ["选项一", "选项二"]
-                  : question.options,
-            rows:
-              type === "matrix"
-                ? question.rows?.length
-                  ? question.rows
-                  : newMatrixQuestion().rows
-                : [],
-            allowOther: terminatingTypes.includes(type)
-              ? !!question.allowOther
-              : false,
-            min: exclusiveTypes.includes(type) ? question.min || 0 : 0,
-            max: exclusiveTypes.includes(type) ? question.max || 0 : 0,
-          };
-        }),
-      ),
+      questions: prev.questions.map((question, i) => {
+        if (i !== index || question.type === type) return question;
+        return {
+          ...question,
+          type,
+          options:
+            type === "matrix"
+              ? [...likertOptions]
+              : question.type === "text"
+                ? ["选项一", "选项二"]
+                : question.options,
+          rows:
+            type === "matrix"
+              ? question.rows?.length
+                ? question.rows
+                : newMatrixQuestion().rows
+              : [],
+          allowOther: terminatingTypes.includes(type)
+            ? !!question.allowOther
+            : false,
+          min: exclusiveTypes.includes(type) ? question.min || 0 : 0,
+          max: exclusiveTypes.includes(type) ? question.max || 0 : 0,
+        };
+      }),
     }));
   }
   function toggleOptionRule(index, key, option, checked) {
     setB((prev) => ({
       ...prev,
-      questions: cleanQuestionRules(
-        prev.questions.map((question, i) =>
-          i !== index
-            ? question
-            : {
-                ...question,
-                [key]: checked
-                  ? [...new Set([...(question[key] || []), option])]
-                  : (question[key] || []).filter((value) => value !== option),
-              },
-        ),
+      questions: prev.questions.map((question, i) =>
+        i !== index
+          ? question
+          : {
+              ...question,
+              [key]: checked
+                ? [...new Set([...(question[key] || []), option])]
+                : (question[key] || []).filter((value) => value !== option),
+            },
       ),
     }));
   }
   function addExclusiveNone(index) {
     setB((prev) => ({
       ...prev,
-      questions: cleanQuestionRules(
-        prev.questions.map((question, i) =>
-          i !== index
-            ? question
-            : {
-                ...question,
-                options: questionOptions(question).includes("以上都无")
-                  ? question.options
-                  : [
-                      ...(question.options || []).filter((option) =>
-                        option.trim(),
-                      ),
-                      "以上都无",
-                    ],
-                exclusiveOptions: [
-                  ...new Set([
-                    ...(question.exclusiveOptions || []),
+      questions: prev.questions.map((question, i) =>
+        i !== index
+          ? question
+          : {
+              ...question,
+              options: questionOptions(question).includes("以上都无")
+                ? question.options
+                : [
+                    ...(question.options || []).filter((option) =>
+                      option.trim(),
+                    ),
                     "以上都无",
-                  ]),
-                ],
-              },
-        ),
+                  ],
+              exclusiveOptions: [
+                ...new Set([...(question.exclusiveOptions || []), "以上都无"]),
+              ],
+            },
       ),
     }));
   }
@@ -933,6 +1000,9 @@ export function ContentEditor({ kind, item, save, close, busy, leaveEditor }) {
       </button>
       <form
         className="editor-form"
+        ref={formRef}
+        noValidate={kind === "surveys"}
+        tabIndex={-1}
         onSubmit={(e) => {
           e.preventDefault();
           if (kind !== "surveys") {
@@ -945,6 +1015,33 @@ export function ContentEditor({ kind, item, save, close, busy, leaveEditor }) {
         }}
       >
         {guard.dialog}
+        {kind === "surveys" && surveyIssues.length > 0 && (
+          <section
+            className="survey-validation-errors"
+            role="alert"
+            aria-label="问卷校验错误"
+          >
+            <h2>有 {surveyIssues.length} 处需要修改</h2>
+            <p>未保存的内容已保留。点击错误可定位到对应字段。</p>
+            <ul>
+              {surveyIssues.map((issue, index) => (
+                <li
+                  key={`${issue.questionId}:${issue.field}:${issue.code}:${index}`}
+                >
+                  <button type="button" onClick={() => focusSurveyIssue(issue)}>
+                    {issue.message}
+                    <small>
+                      {issue.questionId
+                        ? `题目 ID：${issue.questionId} · `
+                        : ""}
+                      字段：{issue.field}
+                    </small>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
         {(surveyConflict || publisher.conflict) && (
           <ConflictRecovery
             value={b}
@@ -970,14 +1067,17 @@ export function ContentEditor({ kind, item, save, close, busy, leaveEditor }) {
         >
           <Field
             label="标题"
+            data-survey-field="title"
             value={b.title}
             onChange={(v) => set("title", v)}
             required
           />
           {kind === "surveys" ? (
             <>
+              {b.id !== "new" && <SurveyLinks id={b.id} />}
               <Field
                 label="问卷说明"
+                data-survey-field="description"
                 type="textarea"
                 rows={3}
                 value={b.description}
@@ -986,12 +1086,14 @@ export function ContentEditor({ kind, item, save, close, busy, leaveEditor }) {
               <div className="field-grid">
                 <Field
                   label="开始时间（可留空）"
+                  data-survey-field="startsAt"
                   type="datetime-local"
                   value={localTime(b.startsAt)}
                   onChange={(v) => set("startsAt", v)}
                 />
                 <Field
                   label="截止时间（可留空）"
+                  data-survey-field="endsAt"
                   type="datetime-local"
                   value={localTime(b.endsAt)}
                   onChange={(v) => set("endsAt", v)}
@@ -1011,21 +1113,29 @@ export function ContentEditor({ kind, item, save, close, busy, leaveEditor }) {
               </div>
               <Field
                 label="提交成功提示"
+                data-survey-field="successMessage"
                 value={b.successMessage}
                 onChange={(v) => set("successMessage", v)}
               />
               <Field
                 label="提前结束提示"
+                data-survey-field="terminationMessage"
                 value={b.terminationMessage}
                 onChange={(v) => set("terminationMessage", v)}
                 placeholder="感谢你的参与，本次问卷到这里结束。"
               />
-              <h2>题目编辑</h2>
+              <h2 data-survey-field="questions" tabIndex={-1}>
+                题目编辑
+              </h2>
               <p className="fine">
                 按顺序展示；同名章节连续分组。可为选项设置提前结束或排他规则，矩阵题每行单选。
               </p>
               {b.questions.map((q, i) => (
-                <section className="question-editor" key={q.id}>
+                <section
+                  className="question-editor"
+                  key={q.id}
+                  data-question-id={q.id}
+                >
                   <div className="question-editor-head">
                     <span className="eyebrow">QUESTION {i + 1}</span>
                     <div>
@@ -1071,6 +1181,7 @@ export function ContentEditor({ kind, item, save, close, busy, leaveEditor }) {
                   <div className="field-grid">
                     <Field
                       label="题目"
+                      data-survey-field="title"
                       value={q.title}
                       onChange={(v) => updateQ(i, "title", v)}
                       required
@@ -1078,6 +1189,7 @@ export function ContentEditor({ kind, item, save, close, busy, leaveEditor }) {
                     <label>
                       题型
                       <select
+                        data-survey-field="type"
                         value={q.type}
                         onChange={(e) => changeQuestionType(i, e.target.value)}
                       >
@@ -1103,6 +1215,14 @@ export function ContentEditor({ kind, item, save, close, busy, leaveEditor }) {
                   />
                   {q.type !== "text" && (
                     <Field
+                      data-survey-field="options"
+                      aria-invalid={
+                        surveyIssues.some(
+                          (issue) =>
+                            issue.questionId === q.id &&
+                            issue.field === "options",
+                        ) || undefined
+                      }
                       label={
                         q.type === "matrix"
                           ? "矩阵列选项（每行一个，从左到右）"
@@ -1111,11 +1231,21 @@ export function ContentEditor({ kind, item, save, close, busy, leaveEditor }) {
                       type="textarea"
                       rows={4}
                       value={(q.options || []).join("\n")}
-                      onChange={(v) => updateQ(i, "options", v.split("\n"))}
+                      onChange={(v) =>
+                        updateQ(i, "options", splitOptionLines(v))
+                      }
                     />
                   )}
+                  {q.type !== "text" && (
+                    <p className="fine">
+                      空白行会在预览和保存时忽略；有效选项的文字和顺序保持不变，重复项需手动修改。
+                    </p>
+                  )}
                   {q.type === "matrix" && (
-                    <div className="matrix-question-builder">
+                    <div
+                      className="matrix-question-builder"
+                      data-survey-field="rows"
+                    >
                       <div className="matrix-builder-heading">
                         <h3>陈述行</h3>
                         <button
@@ -1138,6 +1268,7 @@ export function ContentEditor({ kind, item, save, close, busy, leaveEditor }) {
                           </span>
                           <Field
                             label={`陈述 ${rowIndex + 1}`}
+                            data-survey-row-index={rowIndex}
                             value={row.title}
                             required
                             onChange={(title) =>
@@ -1226,6 +1357,7 @@ export function ContentEditor({ kind, item, save, close, busy, leaveEditor }) {
                       <>
                         <Field
                           label="最少选择（0为不限）"
+                          data-survey-field="min"
                           type="number"
                           min="0"
                           value={q.min}
@@ -1233,6 +1365,7 @@ export function ContentEditor({ kind, item, save, close, busy, leaveEditor }) {
                         />
                         <Field
                           label="最多选择（0为不限）"
+                          data-survey-field="max"
                           type="number"
                           min="0"
                           value={q.max}
@@ -1249,6 +1382,7 @@ export function ContentEditor({ kind, item, save, close, busy, leaveEditor }) {
                   {["single", "multiple", "multirank"].includes(q.type) && (
                     <Toggle
                       label="允许选择“其他”并补充文字"
+                      data-survey-field="allowOther"
                       value={q.allowOther}
                       onChange={(v) => updateQ(i, "allowOther", v)}
                     />
@@ -1274,6 +1408,7 @@ export function ContentEditor({ kind, item, save, close, busy, leaveEditor }) {
                               <strong>{option}</strong>
                               <label className="check">
                                 <input
+                                  data-survey-field="terminateOptions"
                                   type="checkbox"
                                   aria-label={`提前结束：${option}`}
                                   checked={(q.terminateOptions || []).includes(
@@ -1293,6 +1428,7 @@ export function ContentEditor({ kind, item, save, close, busy, leaveEditor }) {
                               {exclusiveTypes.includes(q.type) && (
                                 <label className="check">
                                   <input
+                                    data-survey-field="exclusiveOptions"
                                     type="checkbox"
                                     aria-label={`排他：${option}`}
                                     checked={exclusiveOptionsFor(q).includes(
@@ -1327,11 +1463,48 @@ export function ContentEditor({ kind, item, save, close, busy, leaveEditor }) {
                         </button>
                       )}
                       <p className="fine">
-                        删除或重命名选项后，对应规则与后续引用条件会清除，请重新设置。
+                        删除或重命名选项后，原有规则和跳题引用会保留；请先修复引用再保存。
                       </p>
                     </details>
                   )}
-                  <details>
+                  {["terminateOptions", "exclusiveOptions"].flatMap((key) =>
+                    (q[key] || [])
+                      .filter(
+                        (option) =>
+                          !(
+                            key === "terminateOptions"
+                              ? terminatingTypes
+                              : exclusiveTypes
+                          ).includes(q.type) ||
+                          !questionOptions(q).includes(option),
+                      )
+                      .map((option) => (
+                        <div
+                          className="survey-stale-rule"
+                          key={`${key}:${option}`}
+                        >
+                          <p>
+                            {key === "terminateOptions"
+                              ? "提前结束"
+                              : "排他选择"}
+                            规则“{option}
+                            ”已无法对应当前题型或选项。请恢复原选项，或明确移除此规则。
+                          </p>
+                          <button
+                            type="button"
+                            data-survey-field={key}
+                            onClick={() =>
+                              toggleOptionRule(i, key, option, false)
+                            }
+                          >
+                            移除失效
+                            {key === "terminateOptions" ? "提前结束" : "排他"}
+                            规则“{option}”
+                          </button>
+                        </div>
+                      )),
+                  )}
+                  <details data-survey-field="condition">
                     <summary>条件显示 / 自动跳题</summary>
                     <label>
                       当之前的哪一题
@@ -1348,6 +1521,19 @@ export function ContentEditor({ kind, item, save, close, busy, leaveEditor }) {
                         }
                       >
                         <option value="">始终显示</option>
+                        {q.condition?.questionId &&
+                          !b.questions
+                            .slice(0, i)
+                            .some(
+                              (x) =>
+                                x.id === q.condition.questionId &&
+                                choiceTypes.includes(x.type),
+                            ) && (
+                            <option value={q.condition.questionId}>
+                              原引用题目已删除、后移或变更题型（
+                              {q.condition.questionId}）
+                            </option>
+                          )}
                         {b.questions
                           .slice(0, i)
                           .filter((x) => choiceTypes.includes(x.type))
@@ -1371,6 +1557,16 @@ export function ContentEditor({ kind, item, save, close, busy, leaveEditor }) {
                           }
                         >
                           <option value="">选择一个答案</option>
+                          {q.condition.value &&
+                            !questionOptions(
+                              b.questions.find(
+                                (x) => x.id === q.condition.questionId,
+                              ) || {},
+                            ).includes(q.condition.value) && (
+                              <option value={q.condition.value}>
+                                原选项已失效：{q.condition.value}
+                              </option>
+                            )}
                           {questionOptions(
                             b.questions.find(
                               (x) => x.id === q.condition.questionId,
@@ -1407,7 +1603,7 @@ export function ContentEditor({ kind, item, save, close, busy, leaveEditor }) {
               <button
                 type="button"
                 className="quiet"
-                onClick={() => setPreview(!preview)}
+                onClick={toggleSurveyPreview}
               >
                 <Eye />
                 {preview ? "关闭预览" : "预览问卷"}
@@ -1700,7 +1896,10 @@ export function ContentEditor({ kind, item, save, close, busy, leaveEditor }) {
         )}
       </form>
       {kind === "surveys" && preview && (
-        <Survey key={JSON.stringify(b)} preview={b} />
+        <Survey
+          key={JSON.stringify(b)}
+          preview={normalizeSurveyDefinition(b)}
+        />
       )}
     </>
   );

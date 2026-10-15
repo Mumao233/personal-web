@@ -303,7 +303,7 @@ function MatrixInput({ q, value, onChange }) {
     </div>
   );
 }
-export default function Survey({ id, preview }) {
+export default function Survey({ id, preview, standalone = false, onSubmissionSuccess, onRestart }) {
   const [survey, setSurvey] = useState(preview || null);
   const [answers, setAnswers] = useState({});
   const answersRef = useRef({});
@@ -322,6 +322,7 @@ export default function Survey({ id, preview }) {
   const submissionKey = useRef(null);
   const attempt = useRef(null);
   const inflight = useRef(false);
+  const lifecycle = useRef(null);
 
   const setCurrentAnswers = (next) => {
     answersRef.current = next;
@@ -359,6 +360,12 @@ export default function Survey({ id, preview }) {
 
   useEffect(() => {
     let active = true;
+    const currentVisit = {};
+    lifecycle.current = currentVisit;
+    const dispose = () => {
+      active = false;
+      if (lifecycle.current === currentVisit) lifecycle.current = null;
+    };
     setCurrentAnswers({});
     setSection(0);
     setError("");
@@ -370,12 +377,14 @@ export default function Survey({ id, preview }) {
     setStorageUnavailable(false);
     setVersionConflict(false);
     setUncertain(false);
+    setBusy(false);
+    inflight.current = false;
     setPreviousCopy(null);
     submissionKey.current = newSubmissionKey();
     attempt.current = null;
     if (preview) {
       setSurvey(preview);
-      return;
+      return dispose;
     }
     setSurvey(null);
     let stored = null;
@@ -394,9 +403,9 @@ export default function Survey({ id, preview }) {
       setCurrentAnswers(stored.answers);
       setUncertain(true);
       setDraft(true);
-      return () => { active = false; };
+      return dispose;
     }
-    api("/surveys/" + id)
+    api("/surveys/" + encodeURIComponent(id))
       .then((s) => {
         if (!active) return;
         setSurvey(s);
@@ -433,9 +442,7 @@ export default function Survey({ id, preview }) {
           }
         }
       });
-    return () => {
-      active = false;
-    };
+    return dispose;
   }, [id, preview]);
 
   const change = (key, value) => {
@@ -465,11 +472,14 @@ export default function Survey({ id, preview }) {
 
   if (!survey)
     return (
-      <div className="page">
-        <a className="back" href="/?page=you">
+      <div className="page survey-state">
+        {!standalone && <a className="back" href="/?page=you">
           <ArrowLeft /> 返回问卷
-        </a>
-        <p>{error || "正在打开问卷…"}</p>
+        </a>}
+        <section role={error ? "alert" : "status"}>
+          {error && <h1>问卷暂时无法填写</h1>}
+          <p>{error || "正在打开问卷…"}</p>
+        </section>
       </div>
     );
 
@@ -513,13 +523,16 @@ export default function Survey({ id, preview }) {
     setSuccess(null);
     setResults(null);
     setResultsError("");
+    onRestart?.();
   };
   const reloadSurvey = async () => {
     if (inflight.current) return;
     inflight.current = true;
     setBusy(true);
+    const currentVisit = lifecycle.current;
     try {
-      const current = await api("/surveys/" + id);
+      const current = await api("/surveys/" + encodeURIComponent(id));
+      if (lifecycle.current !== currentVisit) return;
       const previous = { survey, answers: structuredClone(answersRef.current) };
       const clean = pruneSurveyAnswers(current, unchangedAnswers(survey, current, answersRef.current));
       setPreviousCopy(previous);
@@ -533,15 +546,17 @@ export default function Survey({ id, preview }) {
       setVersionConflict(false);
       setUncertain(false);
       storeDraft(current, clean);
-    } catch (e) { setError(e.message); }
-    finally { inflight.current = false; setBusy(false); }
+    } catch (e) { if (lifecycle.current === currentVisit) setError(e.message); }
+    finally { if (lifecycle.current === currentVisit) { inflight.current = false; setBusy(false); } }
   };
   const loadResults = async () => {
     setResultsError("");
+    const currentVisit = lifecycle.current;
     try {
-      setResults(await api("/surveys/" + id + "/results"));
+      const result = await api("/surveys/" + encodeURIComponent(id) + "/results");
+      if (lifecycle.current === currentVisit) setResults(result);
     } catch {
-      setResultsError("回答已保存，统计暂时无法加载。");
+      if (lifecycle.current === currentVisit) setResultsError("回答已保存，统计暂时无法加载。");
     }
   };
   async function submit(e) {
@@ -565,14 +580,19 @@ export default function Survey({ id, preview }) {
     }
     setBusy(true);
     inflight.current = true;
+    const currentVisit = lifecycle.current;
     try {
       const clean = pruneSurveyAnswers(survey, answersRef.current);
       attempt.current ||= { answers: clean, definitionVersion: survey.definitionVersion, submissionKey: submissionKey.current || newSubmissionKey() };
       storeDraft(survey, attempt.current.answers);
-      const result = await api("/surveys/" + id + "/submit", {
+      const result = await api("/surveys/" + encodeURIComponent(id) + "/submit", {
         method: "POST",
         body: attempt.current,
       });
+      if (lifecycle.current !== currentVisit) return;
+      if (!result || !["completed", "terminated"].includes(result.completion)) {
+        throw Object.assign(new Error("服务器未返回有效的提交确认，请重试确认本次提交。"), { code: "INVALID_RESPONSE" });
+      }
       setUncertain(false);
       setSuccess({
         message: result.message || "回答已保存。",
@@ -581,10 +601,12 @@ export default function Survey({ id, preview }) {
       });
       removeDraft();
       setDraft(false);
+      onSubmissionSuccess?.(id, result);
       if (survey.publicResults) await loadResults();
     } catch (e) {
+      if (lifecycle.current !== currentVisit) return;
       setError(e.message);
-      const unknown = !e.status || e.status >= 500 || e.status === 429 || e.status === 408;
+      const unknown = e.code === "INVALID_RESPONSE" || !e.status || e.status >= 500 || e.status === 429 || e.status === 408;
       setUncertain(unknown);
       if (!unknown) {
         attempt.current = null;
@@ -592,20 +614,22 @@ export default function Survey({ id, preview }) {
       }
       if (e.code === "SURVEY_VERSION_CONFLICT") setVersionConflict(true);
     } finally {
-      inflight.current = false;
-      setBusy(false);
+      if (lifecycle.current === currentVisit) {
+        inflight.current = false;
+        setBusy(false);
+      }
     }
   }
 
   return (
     <div className={preview ? "survey-preview" : "reading survey-page"}>
-      {!preview && (
+      {!preview && !standalone && (
         <a className="back" href="/?page=you">
           <ArrowLeft /> 返回问卷
         </a>
       )}
       <span className="eyebrow">
-        {preview ? "PREVIEW / 预览" : "ABOUT YOU / 关于你"}
+        {preview ? "PREVIEW / 预览" : standalone ? "QUESTIONNAIRE / 问卷" : "ABOUT YOU / 关于你"}
       </span>
       <h1>{survey.title}</h1>
       <p className="survey-description">{survey.description}</p>

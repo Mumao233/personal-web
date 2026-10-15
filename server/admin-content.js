@@ -11,6 +11,7 @@ import {
 import { saveContentDraft } from "./content-drafts.js";
 import { normalizeProfile } from "./profile.js";
 import { validateSurvey } from "./validation.js";
+import { normalizeSurveyDefinition } from "../shared/survey-definition.js";
 import { fingerprint, revisionOf, versionedSurvey } from "./versions.js";
 
 export { saveContentDraft };
@@ -191,10 +192,10 @@ function profileData(input, base = {}, { strict = true } = {}) {
 
 function surveyData(input, base = {}, { strict = true } = {}) {
   if (strict) keysOnly(input, fields.surveys, "问卷");
-  const result = {
+  const result = normalizeSurveyDefinition({
     ...pick(base, fields.surveys),
     ...pick(input, fields.surveys),
-  };
+  });
   for (const [key, max] of [
     ["title", 200],
     ["description", 10000],
@@ -541,12 +542,15 @@ export function adminMutate(store, operation) {
             revision: revisionOf(live) + 1,
           });
         else {
-          validation(() => validateSurvey(data));
+          const normalized = validation(() => validateSurvey(data, {
+            previousSurvey: live,
+            submissions: store.list("submissions").filter((row) => row.surveyId === id),
+          }));
           store.put(
             "surveys",
             versionedSurvey({
               ...live,
-              ...data,
+              ...normalized,
               id,
               published: true,
               revision: revisionOf(live) + 1,

@@ -1,3 +1,70 @@
+.survey-share-links {
+  margin: 14px 0;
+  max-width: 100%;
+}
+.survey-share-links > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+}
+.survey-share-links button {
+  padding: 5px 0;
+  font-size: 12px;
+  text-align: left;
+}
+.survey-share-links p {
+  font-size: 12px;
+  margin: 8px 0;
+  color: var(--tone-ink-cab79d);
+}
+.survey-share-links input {
+  width: 100%;
+}
+.survey-validation-errors,
+.survey-stale-rule {
+  padding: 18px;
+  margin: 18px 0;
+  border: 1px solid var(--tone-line-665139);
+  border-radius: 7px;
+  background: var(--tone-surface-0d100f);
+}
+.survey-validation-errors h2 {
+  font-size: 18px;
+  margin: 0 0 10px;
+}
+.survey-validation-errors p,
+.survey-stale-rule p {
+  font-size: 12px;
+  line-height: 1.8;
+}
+.survey-validation-errors ul {
+  margin: 0;
+  padding-left: 20px;
+}
+.survey-validation-errors button,
+.survey-stale-rule button {
+  padding: 8px 0;
+  text-align: left;
+  font-size: 13px;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+  max-width: 100%;
+}
+.survey-validation-errors small {
+  display: block;
+  font-size: 11px;
+  color: var(--tone-ink-cab79d);
+}
+.question-editor [aria-invalid="true"] {
+  border-color: var(--tone-ink-c99b6b);
+}
+.survey-validation-errors button:focus-visible,
+.survey-share-links button:focus-visible,
+.survey-stale-rule button:focus-visible,
+.question-editor [data-survey-field]:focus-visible {
+  outline: 2px solid var(--tone-ink-c99b6b);
+  outline-offset: 4px;
+}
 .matrix-question-builder {
   padding: 18px;
   border: 1px solid var(--tone-line-433b31);

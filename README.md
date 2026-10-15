@@ -70,7 +70,7 @@ v1.0.1 发布前验证：Node 99 项、Python 60 项、彗星轨道 20 项通过
 
 线上网站：https://mumao.site/ · [阿里云部署记录](deploy/README.md)
 
-当前版本：**v1.3.0**。本版为光影更新，用户已于 2026-10-15 批准最新预览上线；实际发布状态以部署记录为准。版本变化见 [更新日志](CHANGELOG.md)，本版范围与验证见 [光影更新](docs/v1.3.0-light-shadow.md)，助手入口见 [调用说明](docs/assistant-admin.md)，发布约定见 [版本发布流程](docs/releases.md)。
+当前版本：**v1.3.1**（用户指定版本）。本版增加独立问卷填写链接，修复选项空行处理并提供可定位的详细报错；已有答卷及规则引用受到保存前校验保护。版本变化见 [更新日志](CHANGELOG.md)，本版范围与验证见 [问卷更新](docs/v1.3.1-surveys.md)，助手入口见 [调用说明](docs/assistant-admin.md)，发布约定见 [版本发布流程](docs/releases.md)。实际发布状态以服务器发布清单和同名 GitHub Release 为准。
 
 此仓库保存整合网站的完整源码。克隆后按“启动”一节安装依赖并运行；本地私有数据库、上传文件、运行缓存和构建产物不包含在仓库中。
 完整站包含 Node/SQLite 与 Python 服务，不能仅把静态 HTML 上传 GitHub Pages。正式上线需支持这两个服务的主机、HTTPS 及持久数据目录。

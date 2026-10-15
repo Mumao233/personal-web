@@ -148,7 +148,7 @@ const survey = {
   revision: 2,
   title: "Original title",
   description: "description",
-  questions: [],
+  questions: [{ id: "recovery-question", title: "填写内容", type: "text" }],
   published: false,
 };
 

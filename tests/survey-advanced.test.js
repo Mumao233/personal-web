@@ -388,7 +388,7 @@ after(async () => {
   if (dir) await rm(dir, { recursive: true, force: true });
 });
 
-test("API computes completion, matrix statistics, filtered export and keeps historical matrix columns", async () => {
+test("API computes completion, matrix statistics, filtered export and prevents deleting answered matrix rows", async () => {
   const created = await call("/admin/surveys/new", "PUT", makeSurvey(), true);
   assert.equal(created.status, 200);
   const id = created.data.id;
@@ -454,10 +454,13 @@ test("API computes completion, matrix statistics, filtered export and keeps hist
       q.id === "scale" ? { ...q, rows: [q.rows[0]] } : q,
     ),
   };
-  assert.equal(
-    (await call(`/admin/surveys/${id}`, "PUT", updatedSurvey, true)).status,
-    200,
-  );
+  const blocked = await call(`/admin/surveys/${id}`, "PUT", updatedSurvey, true);
+  assert.equal(blocked.status, 400);
+  assert.equal(blocked.data.code, "SURVEY_VALIDATION_FAILED");
+  assert.ok(blocked.data.issues.some((issue) => issue.questionId === "scale" && issue.field === "rows" && issue.code === "historical_row_removed"));
+  const unchanged = await call(`/admin/surveys/${id}`, "GET", undefined, true);
+  assert.equal(unchanged.data.revision, created.data.revision);
+  assert.equal(unchanged.data.questions.find((question) => question.id === "scale").rows.length, 2);
   const csv = await fetch(`${base}/api/admin/surveys/${id}/export?format=csv`, {
     headers: { Cookie: cookie },
   });
@@ -492,4 +495,59 @@ test("API computes completion, matrix statistics, filtered export and keeps hist
     },
   });
   assert.equal(invalid.status, 400);
+});
+
+test("API normalizes all option types, reports all save errors and preserves history, references and revision locks", async () => {
+  const definition = {
+    title: "Isolated normalization fixture",
+    published: true,
+    questions: ["single", "multiple", "rank", "multirank", "matrix"].map((type) => ({
+      id: type, type, title: `${type} options`,
+      options: ["", " A ", "\t", "B", "\r\n", ""],
+      ...(type === "matrix" ? { rows: [{ id: "row", title: "matrix row" }] } : {}),
+    })),
+  };
+  definition.questions.push({ id: "text", title: "text ignores option rules", type: "text", options: ["", ""] });
+  const created = await call("/admin/surveys/new", "PUT", definition, true);
+  assert.equal(created.status, 200);
+  const saved = created.data;
+  for (const question of saved.questions.filter((question) => question.type !== "text"))
+    assert.deepEqual(question.options, [" A ", "B"]);
+  const answers = { single: " A ", multiple: [" A "], rank: ["B", " A "], multirank: [" A "], matrix: { row: " A " }, text: "unchanged" };
+  const response = await call(`/surveys/${saved.id}/submit`, "POST", { answers });
+  assert.equal(response.status, 201);
+  const resultsBefore = (await call(`/admin/surveys/${saved.id}/results`, "GET", undefined, true)).data;
+  const invalid = structuredClone(saved);
+  invalid.questions[0].options = ["A", "A", ""];
+  invalid.questions[1].options = ["", "one", " "];
+  invalid.questions[4].options = ["only"];
+  const rejected = await call(`/admin/surveys/${saved.id}`, "PUT", invalid, true);
+  assert.equal(rejected.status, 400);
+  for (const [questionId, code] of [["single", "option_duplicate"], ["single", "historical_option_removed"], ["multiple", "options_too_few"], ["matrix", "options_too_few"]]) {
+    const issue = rejected.data.issues.find((entry) => entry.questionId === questionId && entry.code === code);
+    assert.ok(issue, `${questionId}: ${code}`);
+    assert.equal(issue.field, "options");
+    assert.equal(typeof issue.questionNumber, "number");
+  }
+  assert.deepEqual((await call(`/admin/surveys/${saved.id}`, "GET", undefined, true)).data, saved);
+  assert.deepEqual((await call(`/admin/surveys/${saved.id}/results`, "GET", undefined, true)).data, resultsBefore);
+  const brokenReference = structuredClone(saved);
+  brokenReference.questions[1].exclusiveOptions = ["missing"];
+  brokenReference.questions[1].terminateOptions = ["missing"];
+  brokenReference.questions[5].condition = { questionId: "single", value: "missing" };
+  const referenceError = await call(`/admin/surveys/${saved.id}`, "PUT", brokenReference, true);
+  assert.equal(referenceError.status, 400);
+  for (const field of ["exclusiveOptions", "terminateOptions", "condition"])
+    assert.ok(referenceError.data.issues.some((issue) => issue.field === field));
+  const attempts = await Promise.all(["first writer", "second writer"].map((title) => call(`/admin/surveys/${saved.id}`, "PUT", { ...saved, title }, true)));
+  assert.deepEqual(attempts.map((attempt) => attempt.status).sort(), [200, 409]);
+  assert.equal(attempts.find((attempt) => attempt.status === 409).data.code, "SURVEY_REVISION_CONFLICT");
+  const current = attempts.find((attempt) => attempt.status === 200).data;
+  assert.equal(current.revision, saved.revision + 1);
+  const stale = await call(`/surveys/${saved.id}/submit`, "POST", { answers, definitionVersion: saved.definitionVersion });
+  assert.equal(stale.status, 409);
+  assert.equal(stale.data.code, "SURVEY_VERSION_CONFLICT");
+  const resultsAfter = (await call(`/admin/surveys/${saved.id}/results`, "GET", undefined, true)).data;
+  assert.deepEqual(resultsAfter.rows, resultsBefore.rows);
+  assert.deepEqual(resultsAfter.summary, resultsBefore.summary);
 });

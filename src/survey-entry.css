@@ -1,0 +1,27 @@
+/* The independent form uses the same palette without mounting site modules. */
+.standalone-survey {
+  background:
+    radial-gradient(ellipse at 85% 0%, color-mix(in srgb, var(--space-copper) 9%, transparent), transparent 60%),
+    var(--space-bg);
+}
+.standalone-survey-tools {
+  display: flex;
+  justify-content: flex-end;
+  max-width: 820px;
+  padding: 24px 25px 0;
+  margin: auto;
+}
+.standalone-survey .reading,
+.standalone-survey .survey-state {
+  padding-top: 24px;
+}
+.standalone-survey .survey-state {
+  max-width: 820px;
+  margin: auto;
+  padding: 24px 25px 100px;
+}
+@media (max-width: 759px) {
+  .standalone-survey-tools {
+    padding-top: 16px;
+  }
+}

@@ -681,11 +681,14 @@ for (const kind of ["projects", "posts", "stories", "surveys"]) {
             status: 404,
           });
         if (old) assertRevision(old, b.revision, "SURVEY_REVISION_CONFLICT");
-        validateSurvey(b);
+        const normalized = validateSurvey(b, {
+          previousSurvey: old,
+          submissions: old ? list("submissions").filter((row) => row.surveyId === id) : [],
+        });
         return put(
           kind,
           versionedSurvey({
-            ...b,
+            ...normalized,
             id,
             revision: revisionOf(old) + 1,
             createdAt: old?.createdAt || new Date().toISOString(),
@@ -838,6 +841,9 @@ if (process.argv.includes("--production")) {
 }
 app.use((err, req, res, next) => {
   res.status(err.status || 500).json({
+    ...(err.code === "SURVEY_VALIDATION_FAILED" && Array.isArray(err.issues)
+      ? { issues: err.issues }
+      : {}),
     ...(err.code && /^[A-Z_]+$/.test(err.code)
       ? { code: err.code }
       : err.status === 409

@@ -383,6 +383,9 @@ export function safeError(error) {
   return {
     ok: false,
     status,
+    ...(status === 400 && error.code === "SURVEY_VALIDATION_FAILED" && Array.isArray(error.issues)
+      ? { issues: error.issues }
+      : {}),
     code:
       status === 500
         ? "OPERATION_FAILED"

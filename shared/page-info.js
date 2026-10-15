@@ -24,7 +24,12 @@ export function resolvePageRoute(input) {
       private: true,
     };
   if (query.has("survey"))
-    return { page: "you", type: "survey", id: query.get("survey") };
+    return {
+      page: "you",
+      type: "survey",
+      id: query.get("survey"),
+      standalone: query.get("standalone") === "1",
+    };
   const type = Object.keys(detailPages).find((key) => query.has(key));
   if (type)
     return {
@@ -35,6 +40,10 @@ export function resolvePageRoute(input) {
     };
   const requested = query.get("page") || "home";
   return { page: requested, type: "page", private: requested === "admin" };
+}
+
+export function surveyVisitUrl(id, standalone = false) {
+  return `/?page=you&survey=${encodeURIComponent(id)}${standalone ? "&standalone=1" : ""}`;
 }
 
 function cleanText(value, max = 160) {

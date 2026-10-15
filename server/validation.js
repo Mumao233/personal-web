@@ -1,15 +1,10 @@
+import { normalizeSurveyDefinition, surveyDefinitionIssues } from "../shared/survey-definition.js";
+
 const object = (value) =>
   value !== null && typeof value === "object" && !Array.isArray(value);
 const choiceTypes = ["single", "multiple", "rank", "multirank"];
 const ruleTypes = ["single", "multiple", "multirank"];
 const own = (value, key) => Object.prototype.hasOwnProperty.call(value, key);
-const validId = (value) =>
-  typeof value === "string" &&
-  value.length > 0 &&
-  value.length <= 120 &&
-  !["__proto__", "constructor", "prototype"].includes(value) &&
-  !Object.prototype.hasOwnProperty.call(Object.prototype, value) &&
-  !value.endsWith("__other");
 const optionsFor = (question) => [
   ...new Set([
     ...(question.options || []),
@@ -193,156 +188,16 @@ export function surveyAnswerProgress(survey, answers = {}) {
   return { total, answered, percent: total ? Math.floor(answered / total * 100) : 0, terminated: Boolean(termination) };
 }
 
-export function validateSurvey(survey) {
-  if (
-    !object(survey) ||
-    typeof survey.title !== "string" ||
-    !survey.title.trim() ||
-    survey.title.length > 200
-  )
-    throw Error("请填写问卷标题（最多200字）");
-  if (
-    !Array.isArray(survey.questions) ||
-    !survey.questions.length ||
-    survey.questions.length > 100
-  )
-    throw Error("问卷需要1至100个题目");
-  if (
-    survey.terminationMessage !== undefined &&
-    (typeof survey.terminationMessage !== "string" ||
-      survey.terminationMessage.length > 2000)
-  )
-    throw Error("提前结束提示最多2000字");
-  const previous = new Map();
-  for (const question of survey.questions) {
-    if (
-      !object(question) ||
-      !validId(question.id) ||
-      previous.has(question.id) ||
-      typeof question.title !== "string" ||
-      !question.title.trim() ||
-      question.title.length > 1000
-    )
-      throw Error("题目编号需唯一，且标题不可为空");
-    if (![...choiceTypes, "text", "matrix"].includes(question.type))
-      throw Error("不支持的题型");
-    if (
-      question.type !== "text" &&
-      (!Array.isArray(question.options) ||
-        question.options.length < 2 ||
-        question.options.length > 100 ||
-        new Set(question.options).size !== question.options.length ||
-        question.options.some(
-          (option) =>
-            typeof option !== "string" ||
-            !option.trim() ||
-            option.length > 1000,
-        ))
-    )
-      throw Error("选择与排序题需要至少两个不同选项");
-    if (question.type === "matrix") {
-      if (
-        !Array.isArray(question.rows) ||
-        question.rows.length < 1 ||
-        question.rows.length > 50
-      )
-        throw Error("矩阵题需要1至50行");
-      const rows = new Set();
-      for (const row of question.rows) {
-        if (
-          !object(row) ||
-          !validId(row.id) ||
-          rows.has(row.id) ||
-          typeof row.title !== "string" ||
-          !row.title.trim() ||
-          row.title.length > 1000
-        )
-          throw Error("矩阵行编号需唯一，且行标题不可为空");
-        rows.add(row.id);
-      }
-      if (question.allowOther) throw Error("矩阵题不支持“其他”选项");
-    }
-    if (["text", "rank"].includes(question.type) && question.allowOther)
-      throw Error("文字与全排序题不支持“其他”选项");
-    for (const [name, supported] of [
-      ["terminateOptions", ruleTypes],
-      ["exclusiveOptions", ["multiple", "multirank"]],
-    ]) {
-      const rules = question[name];
-      if (
-        rules !== undefined &&
-        (!Array.isArray(rules) ||
-          new Set(rules).size !== rules.length ||
-          rules.some(
-            (option) =>
-              typeof option !== "string" ||
-              !optionsFor(question).includes(option),
-          ) ||
-          (rules.length && !supported.includes(question.type)))
-      )
-        throw Error(
-          name === "terminateOptions"
-            ? "提前结束规则需要对应题型中的有效选项"
-            : "互斥规则只支持多选或部分排序题中的有效选项",
-        );
-    }
-    if (question.condition?.questionId) {
-      const prerequisite = previous.get(question.condition.questionId);
-      if (!prerequisite) throw Error("条件必须引用之前的题目");
-      if (
-        !choiceTypes.includes(prerequisite.type) ||
-        !optionsFor(prerequisite).includes(question.condition.value)
-      )
-        throw Error("条件答案必须是前置题目的有效选项");
-    }
-    const min = question.min ?? 0,
-      max = question.max ?? 0;
-    if (
-      !Number.isInteger(min) ||
-      !Number.isInteger(max) ||
-      min < 0 ||
-      max < 0 ||
-      (max && min > max) ||
-      (max && max > optionsFor(question).length) ||
-      (min && min > optionsFor(question).length)
-    )
-      throw Error("选择数量范围无效");
-    if (question.type === "single" && (min > 1 || max > 1))
-      throw Error("单选题只能选择一个选项");
-    if (["text", "matrix"].includes(question.type) && (min || max))
-      throw Error("文字和矩阵题不能设置选项数量限制");
-    if (
-      question.type === "rank" &&
-      ((min && min !== question.options.length) ||
-        (max && max !== question.options.length))
-    )
-      throw Error("全排序题必须对全部选项排序，不能限制为部分选项");
-    if (["multiple", "multirank"].includes(question.type)) {
-      const options = optionsFor(question);
-      const exclusives = exclusiveOptionsFor(question);
-      const canSingle =
-        (!max || max >= 1) &&
-        (exclusives.length || (question.terminateOptions || []).length);
-      if (
-        min > options.filter((option) => !exclusives.includes(option)).length &&
-        !canSingle
-      )
-        throw Error("选择数量限制无法满足，请调整互斥选项或最少数量");
-    }
-    previous.set(question.id, question);
-  }
-  if (
-    (survey.startsAt && isNaN(Date.parse(survey.startsAt))) ||
-    (survey.endsAt && isNaN(Date.parse(survey.endsAt)))
-  )
-    throw Error("时间格式无效");
-  if (
-    survey.startsAt &&
-    survey.endsAt &&
-    new Date(survey.startsAt) >= new Date(survey.endsAt)
-  )
-    throw Error("截止时间须晚于开始时间");
-  return survey;
+export function validateSurvey(survey, context) {
+  const normalized = normalizeSurveyDefinition(survey);
+  const issues = surveyDefinitionIssues(normalized, context);
+  if (issues.length)
+    throw Object.assign(Error(issues[0].message), {
+      status: 400,
+      code: "SURVEY_VALIDATION_FAILED",
+      issues,
+    });
+  return normalized;
 }
 
 export function validateAnswers(survey, answers) {

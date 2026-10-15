@@ -1,5 +1,5 @@
-import React, { useEffect, useState, useRef, lazy, Suspense } from "react";
-import { createPortal } from "react-dom";
+import React, { useEffect, useLayoutEffect, useState, useRef, lazy, Suspense } from "react";
+import { createPortal, flushSync } from "react-dom";
 import {
   ArrowUpRight,
   ArrowRight,
@@ -33,6 +33,7 @@ import "./theme-tokens.css";
 import "./style.css";
 import "./space.css";
 import "./navigation.css";
+import "./survey-entry.css";
 const Admin = lazy(() => import("./admin"));
 const World = lazy(() => import("./world"));
 const Space = lazy(() => import("./space"));
@@ -171,6 +172,34 @@ function App() {
   const [data, setData] = useState(null),
     [error, setError] = useState(""),
     [menu, setMenu] = useState(false);
+  // Completion belongs to this document visit, never to storage or another tab.
+  const [visit, setVisit] = useState(() => ({ url: location.href, sequence: 0 }));
+  const visitRef = useRef(visit);
+  visitRef.current = visit;
+  const [confirmedVisit, setConfirmedVisit] = useState(null);
+  useLayoutEffect(() => {
+    const restart = () => {
+      const next = { url: location.href, sequence: visitRef.current.sequence + 1 };
+      visitRef.current = next;
+      flushSync(() => {
+        setVisit(next);
+        setConfirmedVisit(null);
+        setMenu(false);
+      });
+    };
+    const restore = (event) => {
+      if (event.persisted) restart();
+    };
+    window.addEventListener("popstate", restart);
+    // Reset before a bfcache snapshot and again before a restored page is painted.
+    window.addEventListener("pagehide", restore);
+    window.addEventListener("pageshow", restore);
+    return () => {
+      window.removeEventListener("popstate", restart);
+      window.removeEventListener("pagehide", restore);
+      window.removeEventListener("pageshow", restore);
+    };
+  }, []);
   const menuToggle = useRef(null);
   const backdropPointer = useRef(null);
   const closeMenu = () => {
@@ -195,8 +224,10 @@ function App() {
       desktop.removeEventListener?.("change", closeOnDesktop);
     };
   }, [menu]);
-  const query = new URLSearchParams(location.search);
+  const query = new URL(visit.url).searchParams;
   const route = resolvePageRoute(query);
+  const standaloneEntry = route.type === "survey" && route.standalone;
+  const standalone = standaloneEntry && confirmedVisit !== visit;
   const detailKind = route.collection ? route.type : null;
   const detailPage = route.page;
   const page = route.page;
@@ -252,7 +283,7 @@ function App() {
         location.origin,
     ).origin;
     const metadata = buildPublicPageMetadata({
-      url: location.href,
+      url: visit.url,
       origin: canonicalOrigin,
       publicData,
     });
@@ -300,7 +331,7 @@ function App() {
         content: "noindex, nofollow",
       });
     else document.head.querySelector('meta[name="robots"]')?.remove();
-  }, [data, detail, page, route.id, route.type]);
+  }, [data, detail, page, route.id, route.type, visit.url]);
   if (page === "admin")
     return (
       <ModuleBoundary label="管理空间">
@@ -309,14 +340,14 @@ function App() {
         </Suspense>
       </ModuleBoundary>
     );
-  if (!data)
+  if (!data && !standaloneEntry)
     return (
       <div className="loading">
         {error || "正在打开个人空间…"}
         {error && <button onClick={load}>重试</button>}
       </div>
     );
-  const p = data.profile;
+  const p = data?.profile || { name: "林珈诚" };
   return (
     <>
       <a
@@ -326,8 +357,8 @@ function App() {
       >
         跳到主要内容
       </a>
-      <Intro />
-      <ModuleBoundary label="3D 场景" quiet>
+      {!standaloneEntry && <Intro />}
+      {!standalone && <ModuleBoundary label="3D 场景" quiet>
         <Suspense fallback={null}>
           <Space
             home={
@@ -338,11 +369,12 @@ function App() {
             }
           />
         </Suspense>
-      </ModuleBoundary>
+      </ModuleBoundary>}
       <div
-        className={`site-content ${page === "home" && !detailKind ? "is-home" : ""}`}
+        className={`site-content ${page === "home" && !detailKind ? "is-home" : ""} ${standalone ? "standalone-survey" : ""}`}
       >
-        <header className={`header ${menu ? "menu-is-open" : ""}`}>
+        {standalone && <div className="standalone-survey-tools"><ThemeToggle /></div>}
+        {!standalone && <header className={`header ${menu ? "menu-is-open" : ""}`}>
           <a className="wordmark" href="/">
             {p.name}
             <span>PERSONAL SPACE</span>
@@ -437,12 +469,23 @@ function App() {
             ))}
           </nav>
           <ThemeToggle className="desktop-theme-toggle" />
-        </header>
+        </header>}
         <main id="main-content" tabIndex={-1}>
           {route.type === "answer" ? (
             <Answer token={query.get("answer")} />
           ) : route.type === "survey" ? (
-            <Survey id={query.get("survey")} />
+            <Survey
+              key={`${visit.sequence}:${route.id}:${standaloneEntry}`}
+              id={route.id}
+              standalone={standalone}
+              onSubmissionSuccess={(submittedId) => {
+                if (visitRef.current === visit && submittedId === route.id)
+                  setConfirmedVisit(visit);
+              }}
+              onRestart={() => {
+                if (visitRef.current === visit) setConfirmedVisit(null);
+              }}
+            />
           ) : detailKind ? (
             <div className="reading article-reading">
               <a className="back" href={"/?page=" + detailPage}>
@@ -807,14 +850,14 @@ function App() {
             </>
           )}
         </main>
-        <footer>
+        {!standalone && <footer>
           <a href="/">林珈诚 · 个人空间</a>
           <span>慢慢认识世界，也慢慢认识自己。</span>
           <a href="/?page=admin">
             管理 <ArrowUpRight />
           </a>
           <small>© {new Date().getFullYear()} LIN JIACHENG</small>
-        </footer>
+        </footer>}
       </div>
     </>
   );
