@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef, lazy, Suspense } from "react";
+import { createPortal } from "react-dom";
 import {
   ArrowUpRight,
   ArrowRight,
@@ -26,8 +27,12 @@ import ArticleContent from "./article-content";
 import { ProfileFields } from "./profile-fields";
 import { sessionState, newSubmissionKey } from "./browser-state.js";
 import ModuleBoundary from "./module-boundary.jsx";
+import ThemeToggle from "./theme.jsx";
+import { dismissFromPointer } from "./theme-state.js";
+import "./theme-tokens.css";
 import "./style.css";
 import "./space.css";
+import "./navigation.css";
 const Admin = lazy(() => import("./admin"));
 const World = lazy(() => import("./world"));
 const Space = lazy(() => import("./space"));
@@ -166,6 +171,30 @@ function App() {
   const [data, setData] = useState(null),
     [error, setError] = useState(""),
     [menu, setMenu] = useState(false);
+  const menuToggle = useRef(null);
+  const backdropPointer = useRef(null);
+  const closeMenu = () => {
+    setMenu(false);
+    menuToggle.current?.focus({ preventScroll: true });
+  };
+  useEffect(() => {
+    if (!menu) return;
+    const closeOnEscape = (event) => {
+      if (event.key !== "Escape") return;
+      setMenu(false);
+      menuToggle.current?.focus({ preventScroll: true });
+    };
+    const desktop = matchMedia("(min-width: 760px)");
+    const closeOnDesktop = (event) => {
+      if (event.matches) setMenu(false);
+    };
+    document.addEventListener("keydown", closeOnEscape);
+    desktop.addEventListener?.("change", closeOnDesktop);
+    return () => {
+      document.removeEventListener("keydown", closeOnEscape);
+      desktop.removeEventListener?.("change", closeOnDesktop);
+    };
+  }, [menu]);
   const query = new URLSearchParams(location.search);
   const route = resolvePageRoute(query);
   const detailKind = route.collection ? route.type : null;
@@ -313,20 +342,89 @@ function App() {
       <div
         className={`site-content ${page === "home" && !detailKind ? "is-home" : ""}`}
       >
-        <header className="header">
+        <header className={`header ${menu ? "menu-is-open" : ""}`}>
           <a className="wordmark" href="/">
             {p.name}
             <span>PERSONAL SPACE</span>
           </a>
           <button
+            ref={menuToggle}
+            type="button"
             className="menu-toggle"
-            aria-label="导航"
+            aria-label={menu ? "关闭导航" : "打开导航"}
             aria-expanded={menu}
+            aria-controls="mobile-navigation"
             onClick={() => setMenu(!menu)}
           >
             {menu ? <X /> : <MenuIcon />}
           </button>
-          <nav aria-label="主要导航" className={menu ? "open" : ""}>
+          {createPortal(
+            <div className={`mobile-menu-layer ${menu ? "open" : ""}`}>
+              <div
+                className={`mobile-menu-surface ${menu ? "open" : ""}`}
+                aria-hidden="true"
+              />
+              <div
+                className={`menu-backdrop ${menu ? "open" : ""}`}
+                aria-hidden="true"
+                onPointerDown={(event) => {
+                  backdropPointer.current = {
+                    clientX: event.clientX,
+                    clientY: event.clientY,
+                  };
+                }}
+                onPointerUp={(event) => {
+                  if (dismissFromPointer(backdropPointer.current, event))
+                    closeMenu();
+                  backdropPointer.current = null;
+                }}
+                onPointerMove={(event) => {
+                  if (!dismissFromPointer(backdropPointer.current, event))
+                    backdropPointer.current = null;
+                }}
+                onPointerCancel={() => {
+                  backdropPointer.current = null;
+                }}
+                onClick={(event) => {
+                  if (event.detail === 0) closeMenu();
+                }}
+              />
+              <nav
+                id="mobile-navigation"
+                aria-label="手机导航"
+                className={`mobile-navigation ${menu ? "open" : ""}`}
+              >
+                <div className="mobile-menu-top">
+                  <ThemeToggle label />
+                  <button
+                    type="button"
+                    className="menu-close"
+                    aria-label="关闭导航"
+                    onClick={closeMenu}
+                  >
+                    <X size={23} />
+                  </button>
+                </div>
+                {nav.map(([key, label], index) => (
+                  <a
+                    className={page === key ? "active" : ""}
+                    aria-current={page === key ? "page" : undefined}
+                    key={key}
+                    style={{
+                      "--nav-order": index,
+                      "--nav-reverse-order": nav.length - 1 - index,
+                    }}
+                    href={"/?page=" + key}
+                    onClick={() => setMenu(false)}
+                  >
+                    {label}
+                  </a>
+                ))}
+              </nav>
+            </div>,
+            document.body,
+          )}
+          <nav aria-label="主要导航" className="desktop-navigation">
             {nav.map(([key, label]) => (
               <a
                 className={page === key ? "active" : ""}
@@ -338,6 +436,7 @@ function App() {
               </a>
             ))}
           </nav>
+          <ThemeToggle className="desktop-theme-toggle" />
         </header>
         <main id="main-content" tabIndex={-1}>
           {route.type === "answer" ? (

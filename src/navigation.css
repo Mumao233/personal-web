@@ -1,0 +1,244 @@
+/* Theme interpolation happens on registered color tokens, without filtering media
+   or replacing existing component motion. */
+.theme-toggle {
+  min-width: 44px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: var(--space-text);
+  border-radius: 50%;
+}
+.theme-toggle:hover {
+  color: var(--space-ink);
+  background: var(--space-surface);
+}
+.header .desktop-navigation {
+  margin-left: auto;
+}
+.desktop-theme-toggle {
+  margin-left: 24px;
+}
+.mobile-menu-layer {
+  display: none;
+}
+.admin-theme-toggle {
+  justify-content: flex-start;
+  border-radius: 8px;
+  margin-top: 22px;
+  padding: 9px 12px;
+  font-size: 13px;
+}
+.admin-login {
+  position: relative;
+}
+.admin-login-theme {
+  position: absolute;
+  top: 24px;
+  right: 25px;
+}
+/* Existing desktop dropdowns, when present, share the restrained reveal. */
+.navigation-dropdown {
+  opacity: 0;
+  transform: translateY(-5px);
+  transition:
+    opacity 180ms ease-out,
+    transform 180ms ease-out;
+}
+.navigation-dropdown.open {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+@media (max-width: 759px) {
+  .header .desktop-navigation,
+  .desktop-theme-toggle {
+    display: none;
+  }
+  .header .menu-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .mobile-menu-layer {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 90;
+    overflow: clip;
+    pointer-events: none;
+  }
+  .menu-backdrop {
+    position: fixed;
+    inset: 0 auto 0 0;
+    width: 20vw;
+    background: transparent;
+    visibility: hidden;
+    pointer-events: none;
+    touch-action: pan-y;
+  }
+  .menu-backdrop.open {
+    visibility: visible;
+    pointer-events: auto;
+  }
+  /* Feather the complete frosted surface, including its blur. Keeping this
+     separate from the scrolling text avoids both a hard blur boundary and
+     dark background lettering bleeding through the readable menu body. */
+  .mobile-menu-surface,
+  .mobile-navigation {
+    position: fixed;
+    inset: 0 0 0 auto;
+    width: 80vw;
+    height: 100dvh;
+    visibility: hidden;
+    opacity: 0;
+    transform: translateX(100%);
+    transition:
+      transform 300ms ease-out,
+      opacity 240ms ease-out,
+      visibility 0s 300ms;
+  }
+  .mobile-menu-surface {
+    pointer-events: none;
+    background: rgba(var(--menu-surface-rgb), 0.97);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    mask-image: linear-gradient(
+      90deg,
+      transparent 0,
+      rgba(0, 0, 0, 0.08) 8px,
+      rgba(0, 0, 0, 0.32) 20px,
+      rgba(0, 0, 0, 0.72) 36px,
+      rgba(0, 0, 0, 0.94) 56px,
+      #000 80px
+    );
+    -webkit-mask-image: linear-gradient(
+      90deg,
+      transparent 0,
+      rgba(0, 0, 0, 0.08) 8px,
+      rgba(0, 0, 0, 0.32) 20px,
+      rgba(0, 0, 0, 0.72) 36px,
+      rgba(0, 0, 0, 0.94) 56px,
+      #000 80px
+    );
+  }
+  .mobile-navigation {
+    padding: max(22px, env(safe-area-inset-top)) 24px
+      max(40px, env(safe-area-inset-bottom)) max(36px, 10vw);
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    isolation: isolate;
+    color: var(--space-ink);
+    background: transparent;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
+    pointer-events: none;
+  }
+
+  .mobile-menu-surface.open,
+  .mobile-navigation.open {
+    visibility: visible;
+    opacity: 1;
+    transform: translateX(0);
+    transition-delay: 0s;
+  }
+  .mobile-navigation.open {
+    pointer-events: auto;
+  }
+  .mobile-menu-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin: 0 0 26px;
+    min-height: 44px;
+  }
+  .mobile-menu-top .theme-toggle {
+    font-size: 13px;
+    border-radius: 8px;
+    justify-content: flex-start;
+  }
+  .menu-close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 44px;
+    min-height: 44px;
+    border-radius: 50%;
+  }
+  .mobile-navigation > a {
+    min-height: 50px;
+    display: flex;
+    align-items: center;
+    position: relative;
+    font-size: 17px;
+    color: var(--space-text);
+    opacity: 0;
+    transform: translateX(6px);
+    transition:
+      opacity 150ms ease-out,
+      transform 150ms ease-out;
+    transition-delay: calc(var(--nav-reverse-order) * 12ms);
+  }
+  .mobile-navigation.open > a {
+    opacity: 1;
+    transform: translateX(0);
+    transition-delay: calc(55ms + var(--nav-order) * 22ms);
+  }
+  .mobile-navigation > a.active {
+    color: var(--space-ink);
+  }
+  .mobile-navigation > a.active::after {
+    content: "";
+    position: absolute;
+    right: 6px;
+    top: 50%;
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: var(--space-copper);
+  }
+  .admin-sidebar > .admin-theme-toggle {
+    margin: 0;
+    padding: 8px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  /* Override the existing global motion reset only for requested brief fades. */
+  html {
+    transition-duration: 80ms !important;
+  }
+  .mobile-menu-surface,
+  .mobile-navigation,
+  .navigation-dropdown {
+    transform: none;
+    transition-property: opacity, visibility;
+    transition-duration: 80ms, 0s !important;
+    transition-delay: 0s, 80ms;
+  }
+  .mobile-menu-surface.open,
+  .mobile-navigation.open,
+  .navigation-dropdown.open {
+    transition-delay: 0s;
+  }
+  .mobile-navigation > a,
+  .mobile-navigation.open > a {
+    transform: none;
+    transition-delay: 0s;
+    transition-duration: 80ms !important;
+  }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .mobile-menu-surface {
+    background: rgb(var(--menu-surface-rgb));
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    mask-image: none;
+    -webkit-mask-image: none;
+  }
+}

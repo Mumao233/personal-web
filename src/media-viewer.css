@@ -8,7 +8,7 @@
   width: 100%;
 }
 .photo-open:focus-visible {
-  outline: 2px solid #e2b78e;
+  outline: 2px solid var(--tone-line-e2b78e);
   outline-offset: 5px;
 }
 .media-viewer {
@@ -21,8 +21,8 @@
   padding: max(18px, env(safe-area-inset-top))
     max(22px, env(safe-area-inset-right)) max(18px, env(safe-area-inset-bottom))
     max(22px, env(safe-area-inset-left));
-  background: rgba(5, 7, 10, 0.98);
-  color: #eee6d8;
+  background: var(--tone-surface-rgba5710098);
+  color: var(--tone-ink-eee6d8);
 }
 .viewer-toolbar {
   display: flex;
@@ -32,9 +32,9 @@
   flex: 0 0 auto;
 }
 .media-viewer button {
-  color: #eee6d8;
-  background: #202024;
-  border: 1px solid #6d5b4e;
+  color: var(--tone-ink-eee6d8);
+  background: var(--tone-surface-202024);
+  border: 1px solid var(--tone-line-6d5b4e);
   border-radius: 7px;
   min-width: 44px;
   min-height: 44px;
@@ -49,7 +49,7 @@
   cursor: default;
 }
 .media-viewer button:focus-visible {
-  outline: 3px solid #edc79f;
+  outline: 3px solid var(--tone-line-edc79f);
   outline-offset: 3px;
 }
 .viewer-toolbar button {
@@ -92,14 +92,14 @@
   overflow-wrap: anywhere;
 }
 .viewer-caption p {
-  color: #d7ccbd;
+  color: var(--tone-ink-d7ccbd);
   white-space: pre-wrap;
   margin: 0;
 }
 .viewer-caption time {
   display: block;
   margin-top: 5px;
-  color: #b9a28d;
+  color: var(--tone-ink-b9a28d);
   font-size: 12px;
 }
 .viewer-thumbnails {
@@ -119,7 +119,7 @@
 }
 .viewer-thumbnails button[aria-current] {
   opacity: 1;
-  border: 2px solid #edc79f;
+  border: 2px solid var(--tone-line-edc79f);
 }
 .viewer-thumbnails img {
   width: 100%;
@@ -130,7 +130,7 @@
 .project-attachments {
   margin-top: 42px;
   padding-top: 25px;
-  border-top: 1px solid #393229;
+  border-top: 1px solid var(--tone-line-393229);
 }
 .project-attachments h2 {
   font-size: 20px;
@@ -138,7 +138,7 @@
 .project-attachment {
   margin-top: 20px;
   padding: 20px;
-  border: 1px solid #393229;
+  border: 1px solid var(--tone-line-393229);
   border-radius: 10px;
 }
 .project-attachment h3 {
@@ -148,7 +148,7 @@
 }
 .attachment-meta {
   font-size: 13px;
-  color: #b9a28d;
+  color: var(--tone-ink-b9a28d);
 }
 .attachment-actions {
   display: flex;
@@ -157,7 +157,7 @@
   flex-wrap: wrap;
 }
 .attachment-actions a {
-  color: #deb48c;
+  color: var(--tone-ink-deb48c);
   text-decoration: underline;
   text-underline-offset: 3px;
   min-height: 44px;
@@ -179,7 +179,7 @@
   }
   .viewer-stage .viewer-prev,
   .viewer-stage .viewer-next {
-    background: rgba(16, 18, 20, 0.75);
+    background: var(--tone-surface-rgba161820075);
   }
   .viewer-thumbnails {
     justify-content: flex-start;

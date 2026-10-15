@@ -34,6 +34,7 @@ import {
 } from "../server/validation.js";
 import "./publishing.css";
 import "./survey-admin.css";
+import ThemeToggle from "./theme.jsx";
 const labels = {
   profile: "个人资料",
   projects: "作品与项目",
@@ -243,6 +244,7 @@ export default function Admin() {
   if (state === false)
     return (
       <div className="admin-login">
+        <ThemeToggle className="admin-login-theme" />
         <a className="back" href="/">
           <ArrowLeft /> 回到网站
         </a>
@@ -304,6 +306,7 @@ export default function Admin() {
         >
           林珈诚<span>YOUR PERSONAL SPACE</span>
         </a>
+        <ThemeToggle className="admin-theme-toggle" label />
         <span className="eyebrow">管理空间</span>
         <nav>
           {Object.entries(labels).map(([k, v]) => (

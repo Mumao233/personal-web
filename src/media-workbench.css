@@ -1,6 +1,6 @@
 .media-workbench,
 .story-location-fields {
-  border: 1px solid #ffffff20;
+  border: 1px solid var(--tone-line-ffffff20);
   border-radius: 12px;
   padding: 22px;
   display: grid;
@@ -19,7 +19,7 @@
 }
 .media-section-title span {
   font-size: 13px;
-  color: #aca8a2;
+  color: var(--tone-ink-aca8a2);
 }
 .media-photo-grid {
   display: grid;
@@ -27,19 +27,19 @@
   gap: 18px;
 }
 .media-card {
-  border: 1px solid #ffffff20;
+  border: 1px solid var(--tone-line-ffffff20);
   border-radius: 9px;
   padding: 16px;
   display: grid;
   gap: 12px;
   min-width: 0;
-  background: #10151acc;
+  background: var(--tone-surface-10151acc);
 }
 .media-card > img {
   width: 100%;
   aspect-ratio: 4/3;
   object-fit: contain;
-  background: #070a0d;
+  background: var(--tone-surface-070a0d);
   border-radius: 6px;
 }
 .media-card strong,
@@ -52,7 +52,7 @@
 }
 .media-card progress {
   width: 100%;
-  accent-color: #d8b28a;
+  accent-color: var(--tone-ink-d8b28a);
 }
 .media-actions,
 .media-date-candidates {
@@ -68,7 +68,7 @@
 }
 .media-date-candidates {
   padding: 14px;
-  border-left: 2px solid #bc986c;
+  border-left: 2px solid var(--tone-line-bc986c);
 }
 .media-date-candidates span,
 .media-date-candidates p {
@@ -81,12 +81,12 @@
 .location-external-notice {
   font-size: 13px;
   line-height: 1.7;
-  border-left: 2px solid #bc986c;
+  border-left: 2px solid var(--tone-line-bc986c);
   padding: 8px 14px;
-  color: #c7c1b8;
+  color: var(--tone-ink-c7c1b8);
 }
 .location-candidate {
-  border: 1px solid #76634b;
+  border: 1px solid var(--tone-line-76634b);
   border-radius: 8px;
   padding: 16px;
   display: grid;

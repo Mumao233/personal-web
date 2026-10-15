@@ -1,8 +1,8 @@
 .matrix-question-builder {
   padding: 18px;
-  border: 1px solid #433b31;
+  border: 1px solid var(--tone-line-433b31);
   border-radius: 8px;
-  background: #0d100f;
+  background: var(--tone-surface-0d100f);
   margin: 18px 0 24px;
 }
 .matrix-builder-heading {
@@ -34,7 +34,7 @@
   margin-bottom: 0;
 }
 .matrix-row-number {
-  color: #b4946f;
+  color: var(--tone-ink-b4946f);
   font-size: 12px;
   font-variant-numeric: tabular-nums;
 }
@@ -47,13 +47,13 @@
   padding: 7px 5px;
 }
 .question-editor .option-rules-editor {
-  border: 1px solid #463c2e;
+  border: 1px solid var(--tone-line-463c2e);
   border-radius: 7px;
   padding: 13px 15px;
   margin-top: 20px;
 }
 .option-rules-editor summary {
-  color: #d8c1a1;
+  color: var(--tone-ink-d8c1a1);
   cursor: pointer;
 }
 .option-rule-list {
@@ -65,7 +65,7 @@
   grid-template-columns: minmax(0, 1fr) 105px 100px;
   align-items: center;
   gap: 10px;
-  border-top: 1px solid #302b24;
+  border-top: 1px solid var(--tone-line-302b24);
   padding: 12px 0;
 }
 .option-rule-row > strong {
@@ -79,7 +79,7 @@
   gap: 6px;
 }
 .option-rule-row .check input {
-  accent-color: #c99b6b;
+  accent-color: var(--tone-ink-c99b6b);
 }
 .survey-dashboard {
   --stats-accent: #c99b6b;
@@ -98,7 +98,7 @@
   min-width: 0;
 }
 .survey-dashboard-heading .eyebrow {
-  color: #b79469;
+  color: var(--tone-ink-b79469);
   font-size: 10px;
 }
 .survey-dashboard-heading h2 {
@@ -143,7 +143,7 @@
   display: flex;
   border: 1px solid var(--stats-line);
   border-radius: 6px;
-  background: #10120f;
+  background: var(--tone-surface-10120f);
   padding: 4px;
 }
 .survey-results-filters button {
@@ -159,13 +159,13 @@
   opacity: 0.7;
 }
 .survey-results-filters button[aria-pressed="true"] {
-  background: #33281c;
-  color: #eed0a5;
+  background: var(--tone-surface-33281c);
+  color: var(--tone-ink-eed0a5);
   box-shadow: inset 0 0 0 1px #6b503333;
 }
 .survey-results-refresh {
   font-size: 12px;
-  color: #cab79d;
+  color: var(--tone-ink-cab79d);
   padding: 10px 0 10px 15px;
   white-space: nowrap;
 }
@@ -220,7 +220,7 @@
   font-variant-numeric: tabular-nums;
 }
 .survey-overview-stats small {
-  color: #897d6d;
+  color: var(--tone-ink-897d6d);
   font-size: 8px;
   letter-spacing: 0.12em;
 }
@@ -239,7 +239,11 @@
 }
 .survey-chart-card {
   border: 1px solid var(--stats-line);
-  background: linear-gradient(135deg, #171914d9, #0d100eea);
+  background: linear-gradient(
+    135deg,
+    var(--tone-surface-171914d9),
+    var(--tone-surface-0d100eea)
+  );
   border-radius: 8px;
   padding: 23px 23px 0;
   min-width: 0;
@@ -264,7 +268,7 @@
 }
 .survey-chart-topline > span:last-child {
   padding: 3px 7px;
-  border: 1px solid #453829;
+  border: 1px solid var(--tone-line-453829);
   border-radius: 3px;
   white-space: nowrap;
 }
@@ -302,7 +306,7 @@
 }
 .survey-bar-label b {
   font-size: 13px;
-  color: #e2c195;
+  color: var(--tone-ink-e2c195);
   font-weight: 500;
   font-variant-numeric: tabular-nums;
 }
@@ -312,26 +316,30 @@
 }
 .survey-bar-track {
   height: 7px;
-  background: #443b2d66;
+  background: var(--tone-surface-443b2d66);
   border-radius: 2px;
   overflow: hidden;
 }
 .survey-bar-track i {
   display: block;
   height: 100%;
-  background: linear-gradient(90deg, #7b6549, #cf9d63);
+  background: linear-gradient(
+    90deg,
+    var(--tone-surface-7b6549),
+    var(--tone-surface-cf9d63)
+  );
   border-radius: 2px;
 }
 .survey-bar-row > small {
   display: block;
-  color: #a99c89;
+  color: var(--tone-ink-a99c89);
   font-size: 10px;
   margin-top: 7px;
 }
 .survey-chart-method {
   margin: auto -23px 0;
   padding: 0 23px;
-  border-top: 1px solid #383025;
+  border-top: 1px solid var(--tone-line-383025);
   color: var(--stats-muted);
   font-size: 11px;
 }
@@ -347,7 +355,7 @@
   display: none;
 }
 .survey-chart-method summary span {
-  color: #c39c6f;
+  color: var(--tone-ink-c39c6f);
   font-size: 13px;
 }
 .survey-chart-method[open] summary span {
@@ -373,7 +381,11 @@
   display: block;
   width: 70px;
   height: 7px;
-  background: linear-gradient(90deg, #c4905309, #c49053ad);
+  background: linear-gradient(
+    90deg,
+    var(--tone-surface-c4905309),
+    var(--tone-surface-c49053ad)
+  );
   border-radius: 2px;
 }
 .survey-heatmap-scroll {
@@ -396,7 +408,7 @@
 }
 .survey-heatmap th {
   font-weight: 400;
-  color: #c5bba9;
+  color: var(--tone-ink-c5bba9);
   line-height: 1.7;
 }
 .survey-heatmap thead th {
@@ -424,7 +436,7 @@
 .survey-heatmap td small {
   display: block;
   font-size: 10px;
-  color: #d0c7b8;
+  color: var(--tone-ink-d0c7b8);
   margin-top: 2px;
 }
 .survey-heatmap-total {
@@ -437,9 +449,9 @@
 .survey-text-sample blockquote {
   margin: 0 0 15px;
   padding: 0 0 0 14px;
-  border-left: 2px solid #795e3f;
+  border-left: 2px solid var(--tone-line-795e3f);
   font-size: 12px;
-  color: #d7cfc0;
+  color: var(--tone-ink-d7cfc0);
   line-height: 1.9;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
@@ -456,7 +468,7 @@
   text-align: center;
   padding: 55px 25px;
   margin: 30px 0;
-  background: #11140f;
+  background: var(--tone-surface-11140f);
 }
 .survey-results-empty h3 {
   font-size: 23px;
@@ -503,21 +515,21 @@
 }
 .survey-completion-badge {
   font-size: 10px;
-  border: 1px solid #405040;
-  color: #b3c4a4;
+  border: 1px solid var(--tone-line-405040);
+  color: var(--tone-ink-b3c4a4);
   padding: 3px 8px;
   border-radius: 3px;
   white-space: nowrap;
 }
 .survey-completion-badge.is-terminated {
-  color: #d3b489;
-  border-color: #665139;
+  color: var(--tone-ink-d3b489);
+  border-color: var(--tone-line-665139);
 }
 .survey-termination-note {
-  border-left: 2px solid #c99b6b;
+  border-left: 2px solid var(--tone-line-c99b6b);
   padding: 10px 14px;
-  background: #32271877;
-  color: #d8b88f;
+  background: var(--tone-surface-32271877);
+  color: var(--tone-ink-d8b88f);
   font-size: 12px;
 }
 .survey-submission-answer {
@@ -529,7 +541,7 @@
 }
 .survey-submission-answer > p {
   white-space: pre-wrap;
-  color: #bfb4a1;
+  color: var(--tone-ink-bfb4a1);
   font-size: 12px;
   overflow-wrap: anywhere;
 }
@@ -543,15 +555,15 @@
   grid-template-columns: minmax(0, 1fr) 150px;
   gap: 20px;
   padding: 8px 0;
-  border-bottom: 1px solid #302c25;
+  border-bottom: 1px solid var(--tone-line-302c25);
   font-size: 12px;
 }
 .survey-matrix-answer dt {
-  color: #c3b7a4;
+  color: var(--tone-ink-c3b7a4);
 }
 .survey-matrix-answer dd {
   margin: 0;
-  color: #e0c5a1;
+  color: var(--tone-ink-e0c5a1);
 }
 @media (max-width: 1000px) {
   .survey-charts-grid {

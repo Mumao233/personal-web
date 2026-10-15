@@ -8,6 +8,7 @@ import {
   Plus,
   X,
 } from "@phosphor-icons/react";
+import { useTheme } from "./theme.jsx";
 
 export const destinations = [
   {
@@ -61,9 +62,10 @@ export const destinations = [
 ];
 
 function Scene({ exploring, home, reduced, anchors, command, onState }) {
+  const theme = useTheme();
   const mount = useRef(null);
-  const state = useRef({ exploring, reduced, home });
-  state.current = { exploring, reduced, home };
+  const state = useRef({ exploring, reduced, home, theme });
+  state.current = { exploring, reduced, home, theme };
   useEffect(() => {
     let disposed = false,
       renderer,
@@ -102,7 +104,14 @@ function Scene({ exploring, home, reduced, anchors, command, onState }) {
         };
         renderer.domElement.addEventListener("webglcontextlost", onContextLost);
         scene = new THREE.Scene();
-        scene.fog = new THREE.FogExp2(0x050505, 0.015);
+        scene.fog = new THREE.FogExp2(
+          state.current.theme === "light" ? 0xf6f2e9 : 0x050505,
+          0.015,
+        );
+        let sceneTheme = state.current.theme,
+          themeStarted = 0;
+        const themeFrom = scene.fog.color.clone();
+        const themeTo = scene.fog.color.clone();
         const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 100);
         camera.position.set(0, 2.5, 13.5);
         controls = new OrbitControls(camera, renderer.domElement);
@@ -278,6 +287,17 @@ function Scene({ exploring, home, reduced, anchors, command, onState }) {
           const delta = Math.min((time - lastTime) / 1000, 0.08);
           lastTime = time;
           const { exploring: free, reduced: quiet } = state.current;
+          if (sceneTheme !== state.current.theme) {
+            sceneTheme = state.current.theme;
+            themeStarted = time;
+            themeFrom.copy(scene.fog.color);
+            themeTo.set(sceneTheme === "light" ? 0xf6f2e9 : 0x050505);
+          }
+          scene.fog.color.lerpColors(
+            themeFrom,
+            themeTo,
+            Math.min(1, (time - themeStarted) / (quiet ? 80 : 250)),
+          );
           const width = mount.current.clientWidth,
             narrow = width < 760;
           if (free !== previousMode) {

@@ -9,6 +9,7 @@ import {
 } from "@phosphor-icons/react";
 import { date } from "./api";
 import { cluster } from "./map-utils";
+import { subscribeTheme } from "./theme-state.js";
 export { cluster } from "./map-utils";
 export default function World({ stories = [], onPick, pick, compact = false }) {
   const mount = useRef(null),
@@ -41,7 +42,9 @@ export default function World({ stories = [], onPick, pick, compact = false }) {
     if (flat) return;
     let disposed = false,
       observer,
-      disposeOutline;
+      disposeOutline,
+      unsubscribeTheme,
+      themeFrame;
     setLoading(true);
     (async () => {
       try {
@@ -123,6 +126,32 @@ export default function World({ stories = [], onPick, pick, compact = false }) {
         };
         syncOutline();
         g.scene().add(outline);
+        const paintTheme = () => {
+          cancelAnimationFrame(themeFrame);
+          const start = performance.now();
+          const duration = matchMedia("(prefers-reduced-motion: reduce)")
+            .matches
+            ? 80
+            : 250;
+          const paint = (time) => {
+            if (disposed) return;
+            const style = getComputedStyle(document.documentElement);
+            const surface =
+              style.getPropertyValue("--tone-surface-080a0b").trim() ||
+              "#080a0b";
+            const line =
+              style.getPropertyValue("--tone-ink-8dabb8").trim() || "#8dabb8";
+            g.backgroundColor(surface);
+            g.globeMaterial().color.set(surface);
+            g.pathColor(() => line);
+            outlineMaterial.color.set(line);
+            if (time - start < duration + 32)
+              themeFrame = requestAnimationFrame(paint);
+          };
+          paint(start);
+        };
+        paintTheme();
+        unsubscribeTheme = subscribeTheme(paintTheme);
         disposeOutline = () => {
           g.scene().remove(outline);
           outlineGeometry.dispose();
@@ -161,6 +190,8 @@ export default function World({ stories = [], onPick, pick, compact = false }) {
     return () => {
       disposed = true;
       observer?.disconnect();
+      unsubscribeTheme?.();
+      cancelAnimationFrame(themeFrame);
       disposeOutline?.();
       if (instance.current) {
         instance.current._destructor();

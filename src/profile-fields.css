@@ -6,7 +6,7 @@
   margin: 0 0 10px;
 }
 .profile-field-editor {
-  border: 1px solid #393329;
+  border: 1px solid var(--tone-line-393329);
   border-radius: 8px;
   padding: 18px;
   display: grid;
@@ -52,11 +52,11 @@
 .profile-public-fields > div {
   min-width: 0;
   padding: 20px 0;
-  border-bottom: 1px solid #ffffff13;
+  border-bottom: 1px solid var(--tone-line-ffffff13);
 }
 .profile-public-fields dt {
   overflow-wrap: anywhere;
-  color: #b6a58e;
+  color: var(--tone-ink-b6a58e);
   font-size: 12px;
   margin-bottom: 7px;
 }
@@ -78,7 +78,7 @@
   overflow-wrap: anywhere;
 }
 .profile-public-fields a:hover {
-  color: #eac591;
+  color: var(--tone-ink-eac591);
 }
 .profile-public-fields a svg {
   flex: 0 0 15px;

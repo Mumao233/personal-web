@@ -1,7 +1,7 @@
 .article-content {
   container-type: inline-size;
   container-name: article;
-  color: #e7e1d5;
+  color: var(--space-ink);
   overflow-wrap: anywhere;
   min-width: 0;
 }
@@ -15,7 +15,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 8px 18px;
-  color: #b49a7f;
+  color: var(--tone-ink-b49a7f);
   font-size: 12px;
   letter-spacing: 0.04em;
   margin-bottom: 20px;
@@ -29,7 +29,7 @@
 }
 .article-excerpt {
   font-size: 16px;
-  color: #a69e92;
+  color: var(--space-muted);
   line-height: 1.95;
   margin: 22px 0 0;
 }
@@ -45,7 +45,7 @@
 }
 .rich-body {
   display: flow-root;
-  color: #d3ccbf;
+  color: var(--tone-ink-d3ccbf);
   line-height: 2.05;
   font-size: 16px;
   overflow-wrap: anywhere;
@@ -58,7 +58,7 @@
 }
 .rich-body h2,
 .rich-body h3 {
-  color: #efe8db;
+  color: var(--tone-ink-efe8db);
   clear: both;
   margin: 1.9em 0 0.9em;
   font-weight: 500;
@@ -77,16 +77,16 @@
   margin-bottom: 0;
 }
 .rich-body strong {
-  color: #f0e4d3;
+  color: var(--tone-ink-f0e4d3);
   font-weight: 600;
 }
 .rich-body a {
-  color: #deb48c;
+  color: var(--tone-ink-deb48c);
   text-decoration: underline;
   text-underline-offset: 4px;
 }
 .rich-body a:hover {
-  color: #f3cca4;
+  color: var(--tone-ink-f3cca4);
 }
 .rich-body ul,
 .rich-body ol {
@@ -106,10 +106,10 @@
 }
 .rich-body blockquote {
   display: flow-root;
-  border-left: 2px solid #a77e57;
+  border-left: 2px solid var(--tone-line-a77e57);
   margin: 1.8em 0;
   padding: 8px 0 8px 24px;
-  color: #b8ac9c;
+  color: var(--tone-ink-b8ac9c);
 }
 .rich-body blockquote > :last-child {
   margin-bottom: 0;
@@ -117,7 +117,7 @@
 .rich-body hr {
   clear: both;
   border: 0;
-  border-top: 1px solid #393229;
+  border-top: 1px solid var(--tone-line-393229);
   margin: 40px 0;
 }
 .rich-image {
@@ -151,7 +151,7 @@
 }
 .rich-image figcaption {
   font-size: 12px;
-  color: #a89c8a;
+  color: var(--tone-ink-a89c8a);
   line-height: 1.8;
   margin-top: 10px;
   text-align: center;
@@ -161,11 +161,11 @@
   clear: both;
   margin-top: 46px;
   padding-top: 30px;
-  border-top: 1px solid #393229;
+  border-top: 1px solid var(--tone-line-393229);
 }
 .article-gallery > h2 {
   font-size: 16px;
-  color: #b9a48b;
+  color: var(--tone-ink-b9a48b);
 }
 .article-gallery .photo-grid img {
   height: auto;
@@ -177,7 +177,7 @@
   min-width: 0;
 }
 .article-gallery figcaption {
-  color: #b9a48b;
+  color: var(--tone-ink-b9a48b);
   font-size: 12px;
   margin-top: 8px;
   line-height: 1.7;
@@ -187,7 +187,7 @@
   margin-top: 35px;
 }
 .story-detail .story-entry + .story-entry {
-  border-top: 1px solid #393229;
+  border-top: 1px solid var(--tone-line-393229);
   padding-top: 22px;
   margin-top: 26px;
 }

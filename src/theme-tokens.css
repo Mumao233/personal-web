@@ -1,0 +1,2197 @@
+/* Theme tokens preserve original dark values. Light surfaces are warm paper;
+   ink/line tokens keep source hues at readable luminance. Media is untouched. */
+@property --space-bg {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #050505;
+}
+@property --space-surface {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #111211;
+}
+@property --space-ink {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #e7e1d5;
+}
+@property --space-text {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #c9c0b2;
+}
+@property --space-muted {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #a69e92;
+}
+@property --space-line {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #302b25;
+}
+@property --space-copper {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #c58a55;
+}
+@property --space-blue {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #8aadb9;
+}
+@property --tone-ink-080a0b {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #080a0b;
+}
+@property --tone-ink-100c08 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #100c08;
+}
+@property --tone-ink-100d09 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #100d09;
+}
+@property --tone-ink-140e09 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #140e09;
+}
+@property --tone-ink-18140f {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #18140f;
+}
+@property --tone-ink-354e60 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #354e60;
+}
+@property --tone-ink-536e81 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #536e81;
+}
+@property --tone-ink-607f95 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #607f95;
+}
+@property --tone-ink-658aa2 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #658aa2;
+}
+@property --tone-ink-776248 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #776248;
+}
+@property --tone-ink-7f8075 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #7f8075;
+}
+@property --tone-ink-809bad {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #809bad;
+}
+@property --tone-ink-897d6d {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #897d6d;
+}
+@property --tone-ink-8dabb8 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #8dabb8;
+}
+@property --tone-ink-918674 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #918674;
+}
+@property --tone-ink-938b7f {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #938b7f;
+}
+@property --tone-ink-958674 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #958674;
+}
+@property --tone-ink-9b907f {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #9b907f;
+}
+@property --tone-ink-9f9382 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #9f9382;
+}
+@property --tone-ink-a09483 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #a09483;
+}
+@property --tone-ink-a1917d {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #a1917d;
+}
+@property --tone-ink-a19685 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #a19685;
+}
+@property --tone-ink-a39787 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #a39787;
+}
+@property --tone-ink-a69b8a {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #a69b8a;
+}
+@property --tone-ink-a79d8b {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #a79d8b;
+}
+@property --tone-ink-a7acae {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #a7acae;
+}
+@property --tone-ink-a89b88 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #a89b88;
+}
+@property --tone-ink-a89c8a {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #a89c8a;
+}
+@property --tone-ink-a99880 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #a99880;
+}
+@property --tone-ink-a99a84 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #a99a84;
+}
+@property --tone-ink-a99c89 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #a99c89;
+}
+@property --tone-ink-aa8158 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #aa8158;
+}
+@property --tone-ink-aa9984 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #aa9984;
+}
+@property --tone-ink-ab9b83 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #ab9b83;
+}
+@property --tone-ink-ac9a7f {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #ac9a7f;
+}
+@property --tone-ink-aca08e {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #aca08e;
+}
+@property --tone-ink-aca8a2 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #aca8a2;
+}
+@property --tone-ink-ad8053 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #ad8053;
+}
+@property --tone-ink-af906c {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #af906c;
+}
+@property --tone-ink-afa497 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #afa497;
+}
+@property --tone-ink-b09c83 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #b09c83;
+}
+@property --tone-ink-b0a18e {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #b0a18e;
+}
+@property --tone-ink-b1a591 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #b1a591;
+}
+@property --tone-ink-b3a795 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #b3a795;
+}
+@property --tone-ink-b3aa9c {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #b3aa9c;
+}
+@property --tone-ink-b3c4a4 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #b3c4a4;
+}
+@property --tone-ink-b4946f {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #b4946f;
+}
+@property --tone-ink-b49a7f {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #b49a7f;
+}
+@property --tone-ink-b4a792 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #b4a792;
+}
+@property --tone-ink-b5a792 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #b5a792;
+}
+@property --tone-ink-b6a58e {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #b6a58e;
+}
+@property --tone-ink-b78a5f {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #b78a5f;
+}
+@property --tone-ink-b79469 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #b79469;
+}
+@property --tone-ink-b7d4bc {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #b7d4bc;
+}
+@property --tone-ink-b8ac9c {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #b8ac9c;
+}
+@property --tone-ink-b9a28d {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #b9a28d;
+}
+@property --tone-ink-b9a48b {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #b9a48b;
+}
+@property --tone-ink-b9a88f {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #b9a88f;
+}
+@property --tone-ink-b9aa98 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #b9aa98;
+}
+@property --tone-ink-b9ad9a {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #b9ad9a;
+}
+@property --tone-ink-bdab91 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #bdab91;
+}
+@property --tone-ink-bdb19b {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #bdb19b;
+}
+@property --tone-ink-bfa080 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #bfa080;
+}
+@property --tone-ink-bfb39e {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #bfb39e;
+}
+@property --tone-ink-bfb4a1 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #bfb4a1;
+}
+@property --tone-ink-c2b8a8 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #c2b8a8;
+}
+@property --tone-ink-c39c6f {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #c39c6f;
+}
+@property --tone-ink-c3b7a4 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #c3b7a4;
+}
+@property --tone-ink-c3b9aa {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #c3b9aa;
+}
+@property --tone-ink-c4b9a6 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #c4b9a6;
+}
+@property --tone-ink-c58a55 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #c58a55;
+}
+@property --tone-ink-c5b8a8 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #c5b8a8;
+}
+@property --tone-ink-c5bba9 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #c5bba9;
+}
+@property --tone-ink-c5bcad {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #c5bcad;
+}
+@property --tone-ink-c6bba9 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #c6bba9;
+}
+@property --tone-ink-c7a888 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #c7a888;
+}
+@property --tone-ink-c7b398 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #c7b398;
+}
+@property --tone-ink-c7c1b8 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #c7c1b8;
+}
+@property --tone-ink-c8bdaa {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #c8bdaa;
+}
+@property --tone-ink-c99b6b {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #c99b6b;
+}
+@property --tone-ink-c9a779 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #c9a779;
+}
+@property --tone-ink-cab79d {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #cab79d;
+}
+@property --tone-ink-ceb18f {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #ceb18f;
+}
+@property --tone-ink-d0bfa9 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #d0bfa9;
+}
+@property --tone-ink-d0c1ac {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #d0c1ac;
+}
+@property --tone-ink-d0c7b8 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #d0c7b8;
+}
+@property --tone-ink-d1c6b4 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #d1c6b4;
+}
+@property --tone-ink-d3b489 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #d3b489;
+}
+@property --tone-ink-d3ccbf {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #d3ccbf;
+}
+@property --tone-ink-d5aa7e {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #d5aa7e;
+}
+@property --tone-ink-d6a879 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #d6a879;
+}
+@property --tone-ink-d6aa78 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #d6aa78;
+}
+@property --tone-ink-d7a16a {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #d7a16a;
+}
+@property --tone-ink-d7b388 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #d7b388;
+}
+@property --tone-ink-d7ccbd {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #d7ccbd;
+}
+@property --tone-ink-d7cfc0 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #d7cfc0;
+}
+@property --tone-ink-d8b288 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #d8b288;
+}
+@property --tone-ink-d8b28a {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #d8b28a;
+}
+@property --tone-ink-d8b88f {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #d8b88f;
+}
+@property --tone-ink-d8c1a1 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #d8c1a1;
+}
+@property --tone-ink-d9c8af {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #d9c8af;
+}
+@property --tone-ink-dabc94 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #dabc94;
+}
+@property --tone-ink-ddb58b {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #ddb58b;
+}
+@property --tone-ink-deb48c {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #deb48c;
+}
+@property --tone-ink-dec49f {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #dec49f;
+}
+@property --tone-ink-dec4a1 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #dec4a1;
+}
+@property --tone-ink-dec7a9 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #dec7a9;
+}
+@property --tone-ink-e0c5a1 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #e0c5a1;
+}
+@property --tone-ink-e0d6c5 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #e0d6c5;
+}
+@property --tone-ink-e1a493 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #e1a493;
+}
+@property --tone-ink-e2c195 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #e2c195;
+}
+@property --tone-ink-e4b583 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #e4b583;
+}
+@property --tone-ink-e4c5a2 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #e4c5a2;
+}
+@property --tone-ink-e6c8a1 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #e6c8a1;
+}
+@property --tone-ink-e9ac99 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #e9ac99;
+}
+@property --tone-ink-e9e5dc {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #e9e5dc;
+}
+@property --tone-ink-eac591 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #eac591;
+}
+@property --tone-ink-eddbc1 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #eddbc1;
+}
+@property --tone-ink-eed0a5 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #eed0a5;
+}
+@property --tone-ink-eed5b0 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #eed5b0;
+}
+@property --tone-ink-eee6d8 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #eee6d8;
+}
+@property --tone-ink-eee7d9 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #eee7d9;
+}
+@property --tone-ink-efb0a0 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #efb0a0;
+}
+@property --tone-ink-efb0a2 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #efb0a2;
+}
+@property --tone-ink-efd6b6 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #efd6b6;
+}
+@property --tone-ink-efe8db {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #efe8db;
+}
+@property --tone-ink-f0d2aa {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #f0d2aa;
+}
+@property --tone-ink-f0d5b3 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #f0d5b3;
+}
+@property --tone-ink-f0e4d3 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #f0e4d3;
+}
+@property --tone-ink-f2b799 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #f2b799;
+}
+@property --tone-ink-f3cca4 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #f3cca4;
+}
+@property --tone-ink-f3d9b4 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #f3d9b4;
+}
+@property --tone-ink-fff1db {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #fff1db;
+}
+@property --tone-ink-fff2d8 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #fff2d8;
+}
+@property --tone-ink-fff5e7 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #fff5e7;
+}
+@property --tone-line-2e2b24 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #2e2b24;
+}
+@property --tone-line-302b24 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #302b24;
+}
+@property --tone-line-302c25 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #302c25;
+}
+@property --tone-line-383025 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #383025;
+}
+@property --tone-line-393024 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #393024;
+}
+@property --tone-line-393229 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #393229;
+}
+@property --tone-line-393329 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #393329;
+}
+@property --tone-line-40392f {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #40392f;
+}
+@property --tone-line-405040 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #405040;
+}
+@property --tone-line-423626 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #423626;
+}
+@property --tone-line-433b31 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #433b31;
+}
+@property --tone-line-453829 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #453829;
+}
+@property --tone-line-463c2e {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #463c2e;
+}
+@property --tone-line-4b4132 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #4b4132;
+}
+@property --tone-line-504232 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #504232;
+}
+@property --tone-line-514433 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #514433;
+}
+@property --tone-line-534737 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #534737;
+}
+@property --tone-line-544029 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #544029;
+}
+@property --tone-line-57412b {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #57412b;
+}
+@property --tone-line-5a4631 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #5a4631;
+}
+@property --tone-line-5b4935 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #5b4935;
+}
+@property --tone-line-5c5237 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #5c5237;
+}
+@property --tone-line-5e4830 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #5e4830;
+}
+@property --tone-line-634a2f {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #634a2f;
+}
+@property --tone-line-665139 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #665139;
+}
+@property --tone-line-6c5135 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #6c5135;
+}
+@property --tone-line-6d5b4e {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #6d5b4e;
+}
+@property --tone-line-726044 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #726044;
+}
+@property --tone-line-76634b {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #76634b;
+}
+@property --tone-line-795e3f {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #795e3f;
+}
+@property --tone-line-796147 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #796147;
+}
+@property --tone-line-7b5d3855 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #7b5d3855;
+}
+@property --tone-line-7d6040 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #7d6040;
+}
+@property --tone-line-805d3d {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #805d3d;
+}
+@property --tone-line-9a6f4266 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #9a6f4266;
+}
+@property --tone-line-9a744e {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #9a744e;
+}
+@property --tone-line-9b724666 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #9b724666;
+}
+@property --tone-line-9c744c {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #9c744c;
+}
+@property --tone-line-9c7854 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #9c7854;
+}
+@property --tone-line-9e7958 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #9e7958;
+}
+@property --tone-line-a77e57 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #a77e57;
+}
+@property --tone-line-bc986c {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #bc986c;
+}
+@property --tone-line-bd915f {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #bd915f;
+}
+@property --tone-line-c58a55 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #c58a55;
+}
+@property --tone-line-c99b6b {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #c99b6b;
+}
+@property --tone-line-dda46f {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #dda46f;
+}
+@property --tone-line-e0bc94 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #e0bc94;
+}
+@property --tone-line-e2b78e {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #e2b78e;
+}
+@property --tone-line-e9be8e {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #e9be8e;
+}
+@property --tone-line-edc79f {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #edc79f;
+}
+@property --tone-line-ffffff13 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #ffffff13;
+}
+@property --tone-line-ffffff20 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #ffffff20;
+}
+@property --tone-surface-000a {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #000a;
+}
+@property --tone-surface-050505bb {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #050505bb;
+}
+@property --tone-surface-050505eb {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #050505eb;
+}
+@property --tone-surface-050505ed {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #050505ed;
+}
+@property --tone-surface-070a0d {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #070a0d;
+}
+@property --tone-surface-080908 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #080908;
+}
+@property --tone-surface-080909 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #080909;
+}
+@property --tone-surface-080a0b {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #080a0b;
+}
+@property --tone-surface-090908 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #090908;
+}
+@property --tone-surface-090a08ed {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #090a08ed;
+}
+@property --tone-surface-090d12 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #090d12;
+}
+@property --tone-surface-0a0b0af5 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #0a0b0af5;
+}
+@property --tone-surface-0b0c0bdb {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #0b0c0bdb;
+}
+@property --tone-surface-0d0e0d {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #0d0e0d;
+}
+@property --tone-surface-0d100eea {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #0d100eea;
+}
+@property --tone-surface-0d100f {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #0d100f;
+}
+@property --tone-surface-10110f {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #10110f;
+}
+@property --tone-surface-10120f {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #10120f;
+}
+@property --tone-surface-101210 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #101210;
+}
+@property --tone-surface-10151acc {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #10151acc;
+}
+@property --tone-surface-11120f {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #11120f;
+}
+@property --tone-surface-11140f {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #11140f;
+}
+@property --tone-surface-111410 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #111410;
+}
+@property --tone-surface-12120ff5 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #12120ff5;
+}
+@property --tone-surface-14120f {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #14120f;
+}
+@property --tone-surface-141512 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #141512;
+}
+@property --tone-surface-15120ce8 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #15120ce8;
+}
+@property --tone-surface-15130f {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #15130f;
+}
+@property --tone-surface-151a20 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #151a20;
+}
+@property --tone-surface-16130f {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #16130f;
+}
+@property --tone-surface-161411 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #161411;
+}
+@property --tone-surface-171510f2 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #171510f2;
+}
+@property --tone-surface-171814 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #171814;
+}
+@property --tone-surface-171914d9 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #171914d9;
+}
+@property --tone-surface-171915 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #171915;
+}
+@property --tone-surface-172820 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #172820;
+}
+@property --tone-surface-181613 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #181613;
+}
+@property --tone-surface-191712 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #191712;
+}
+@property --tone-surface-191a15 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #191a15;
+}
+@property --tone-surface-191b17 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #191b17;
+}
+@property --tone-surface-1b1712 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #1b1712;
+}
+@property --tone-surface-1b1b19 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #1b1b19;
+}
+@property --tone-surface-202015 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #202015;
+}
+@property --tone-surface-202024 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #202024;
+}
+@property --tone-surface-211b14 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #211b14;
+}
+@property --tone-surface-211c16 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #211c16;
+}
+@property --tone-surface-2a2016 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #2a2016;
+}
+@property --tone-surface-302317 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #302317;
+}
+@property --tone-surface-321b17 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #321b17;
+}
+@property --tone-surface-32271877 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #32271877;
+}
+@property --tone-surface-33281c {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #33281c;
+}
+@property --tone-surface-34291d {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #34291d;
+}
+@property --tone-surface-343029 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #343029;
+}
+@property --tone-surface-352719 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #352719;
+}
+@property --tone-surface-37241455 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #37241455;
+}
+@property --tone-surface-37291c {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #37291c;
+}
+@property --tone-surface-37291d {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #37291d;
+}
+@property --tone-surface-443b2d66 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #443b2d66;
+}
+@property --tone-surface-4a3423 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #4a3423;
+}
+@property --tone-surface-54331945 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #54331945;
+}
+@property --tone-surface-765035 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #765035;
+}
+@property --tone-surface-765536 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #765536;
+}
+@property --tone-surface-7b6549 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #7b6549;
+}
+@property --tone-surface-826441 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #826441;
+}
+@property --tone-surface-846744 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #846744;
+}
+@property --tone-surface-9aa7ad {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #9aa7ad;
+}
+@property --tone-surface-9f815b {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #9f815b;
+}
+@property --tone-surface-c4905309 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #c4905309;
+}
+@property --tone-surface-c49053ad {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #c49053ad;
+}
+@property --tone-surface-c4a37b {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #c4a37b;
+}
+@property --tone-surface-cf9d63 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #cf9d63;
+}
+@property --tone-surface-d3a06b {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #d3a06b;
+}
+@property --tone-surface-d9a776 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #d9a776;
+}
+@property --tone-surface-deb086 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #deb086;
+}
+@property --tone-surface-eee4d4 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #eee4d4;
+}
+@property --tone-surface-rgba161820075 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: rgba(16, 18, 20, 0.75);
+}
+@property --tone-surface-rgba5710098 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: rgba(5, 7, 10, 0.98);
+}
+:root {
+  color-scheme: dark;
+  --theme-duration: 250ms;
+  --menu-surface-rgb: 17, 18, 17;
+  --theme-focus: #dda46f;
+  --space-bg: #050505;
+  --space-surface: #111211;
+  --space-ink: #e7e1d5;
+  --space-text: #c9c0b2;
+  --space-muted: #a69e92;
+  --space-line: #302b25;
+  --space-copper: #c58a55;
+  --space-blue: #8aadb9;
+  --tone-ink-080a0b: #080a0b;
+  --tone-ink-100c08: #100c08;
+  --tone-ink-100d09: #100d09;
+  --tone-ink-140e09: #140e09;
+  --tone-ink-18140f: #18140f;
+  --tone-ink-354e60: #354e60;
+  --tone-ink-536e81: #536e81;
+  --tone-ink-607f95: #607f95;
+  --tone-ink-658aa2: #658aa2;
+  --tone-ink-776248: #776248;
+  --tone-ink-7f8075: #7f8075;
+  --tone-ink-809bad: #809bad;
+  --tone-ink-897d6d: #897d6d;
+  --tone-ink-8dabb8: #8dabb8;
+  --tone-ink-918674: #918674;
+  --tone-ink-938b7f: #938b7f;
+  --tone-ink-958674: #958674;
+  --tone-ink-9b907f: #9b907f;
+  --tone-ink-9f9382: #9f9382;
+  --tone-ink-a09483: #a09483;
+  --tone-ink-a1917d: #a1917d;
+  --tone-ink-a19685: #a19685;
+  --tone-ink-a39787: #a39787;
+  --tone-ink-a69b8a: #a69b8a;
+  --tone-ink-a79d8b: #a79d8b;
+  --tone-ink-a7acae: #a7acae;
+  --tone-ink-a89b88: #a89b88;
+  --tone-ink-a89c8a: #a89c8a;
+  --tone-ink-a99880: #a99880;
+  --tone-ink-a99a84: #a99a84;
+  --tone-ink-a99c89: #a99c89;
+  --tone-ink-aa8158: #aa8158;
+  --tone-ink-aa9984: #aa9984;
+  --tone-ink-ab9b83: #ab9b83;
+  --tone-ink-ac9a7f: #ac9a7f;
+  --tone-ink-aca08e: #aca08e;
+  --tone-ink-aca8a2: #aca8a2;
+  --tone-ink-ad8053: #ad8053;
+  --tone-ink-af906c: #af906c;
+  --tone-ink-afa497: #afa497;
+  --tone-ink-b09c83: #b09c83;
+  --tone-ink-b0a18e: #b0a18e;
+  --tone-ink-b1a591: #b1a591;
+  --tone-ink-b3a795: #b3a795;
+  --tone-ink-b3aa9c: #b3aa9c;
+  --tone-ink-b3c4a4: #b3c4a4;
+  --tone-ink-b4946f: #b4946f;
+  --tone-ink-b49a7f: #b49a7f;
+  --tone-ink-b4a792: #b4a792;
+  --tone-ink-b5a792: #b5a792;
+  --tone-ink-b6a58e: #b6a58e;
+  --tone-ink-b78a5f: #b78a5f;
+  --tone-ink-b79469: #b79469;
+  --tone-ink-b7d4bc: #b7d4bc;
+  --tone-ink-b8ac9c: #b8ac9c;
+  --tone-ink-b9a28d: #b9a28d;
+  --tone-ink-b9a48b: #b9a48b;
+  --tone-ink-b9a88f: #b9a88f;
+  --tone-ink-b9aa98: #b9aa98;
+  --tone-ink-b9ad9a: #b9ad9a;
+  --tone-ink-bdab91: #bdab91;
+  --tone-ink-bdb19b: #bdb19b;
+  --tone-ink-bfa080: #bfa080;
+  --tone-ink-bfb39e: #bfb39e;
+  --tone-ink-bfb4a1: #bfb4a1;
+  --tone-ink-c2b8a8: #c2b8a8;
+  --tone-ink-c39c6f: #c39c6f;
+  --tone-ink-c3b7a4: #c3b7a4;
+  --tone-ink-c3b9aa: #c3b9aa;
+  --tone-ink-c4b9a6: #c4b9a6;
+  --tone-ink-c58a55: #c58a55;
+  --tone-ink-c5b8a8: #c5b8a8;
+  --tone-ink-c5bba9: #c5bba9;
+  --tone-ink-c5bcad: #c5bcad;
+  --tone-ink-c6bba9: #c6bba9;
+  --tone-ink-c7a888: #c7a888;
+  --tone-ink-c7b398: #c7b398;
+  --tone-ink-c7c1b8: #c7c1b8;
+  --tone-ink-c8bdaa: #c8bdaa;
+  --tone-ink-c99b6b: #c99b6b;
+  --tone-ink-c9a779: #c9a779;
+  --tone-ink-cab79d: #cab79d;
+  --tone-ink-ceb18f: #ceb18f;
+  --tone-ink-d0bfa9: #d0bfa9;
+  --tone-ink-d0c1ac: #d0c1ac;
+  --tone-ink-d0c7b8: #d0c7b8;
+  --tone-ink-d1c6b4: #d1c6b4;
+  --tone-ink-d3b489: #d3b489;
+  --tone-ink-d3ccbf: #d3ccbf;
+  --tone-ink-d5aa7e: #d5aa7e;
+  --tone-ink-d6a879: #d6a879;
+  --tone-ink-d6aa78: #d6aa78;
+  --tone-ink-d7a16a: #d7a16a;
+  --tone-ink-d7b388: #d7b388;
+  --tone-ink-d7ccbd: #d7ccbd;
+  --tone-ink-d7cfc0: #d7cfc0;
+  --tone-ink-d8b288: #d8b288;
+  --tone-ink-d8b28a: #d8b28a;
+  --tone-ink-d8b88f: #d8b88f;
+  --tone-ink-d8c1a1: #d8c1a1;
+  --tone-ink-d9c8af: #d9c8af;
+  --tone-ink-dabc94: #dabc94;
+  --tone-ink-ddb58b: #ddb58b;
+  --tone-ink-deb48c: #deb48c;
+  --tone-ink-dec49f: #dec49f;
+  --tone-ink-dec4a1: #dec4a1;
+  --tone-ink-dec7a9: #dec7a9;
+  --tone-ink-e0c5a1: #e0c5a1;
+  --tone-ink-e0d6c5: #e0d6c5;
+  --tone-ink-e1a493: #e1a493;
+  --tone-ink-e2c195: #e2c195;
+  --tone-ink-e4b583: #e4b583;
+  --tone-ink-e4c5a2: #e4c5a2;
+  --tone-ink-e6c8a1: #e6c8a1;
+  --tone-ink-e9ac99: #e9ac99;
+  --tone-ink-e9e5dc: #e9e5dc;
+  --tone-ink-eac591: #eac591;
+  --tone-ink-eddbc1: #eddbc1;
+  --tone-ink-eed0a5: #eed0a5;
+  --tone-ink-eed5b0: #eed5b0;
+  --tone-ink-eee6d8: #eee6d8;
+  --tone-ink-eee7d9: #eee7d9;
+  --tone-ink-efb0a0: #efb0a0;
+  --tone-ink-efb0a2: #efb0a2;
+  --tone-ink-efd6b6: #efd6b6;
+  --tone-ink-efe8db: #efe8db;
+  --tone-ink-f0d2aa: #f0d2aa;
+  --tone-ink-f0d5b3: #f0d5b3;
+  --tone-ink-f0e4d3: #f0e4d3;
+  --tone-ink-f2b799: #f2b799;
+  --tone-ink-f3cca4: #f3cca4;
+  --tone-ink-f3d9b4: #f3d9b4;
+  --tone-ink-fff1db: #fff1db;
+  --tone-ink-fff2d8: #fff2d8;
+  --tone-ink-fff5e7: #fff5e7;
+  --tone-line-2e2b24: #2e2b24;
+  --tone-line-302b24: #302b24;
+  --tone-line-302c25: #302c25;
+  --tone-line-383025: #383025;
+  --tone-line-393024: #393024;
+  --tone-line-393229: #393229;
+  --tone-line-393329: #393329;
+  --tone-line-40392f: #40392f;
+  --tone-line-405040: #405040;
+  --tone-line-423626: #423626;
+  --tone-line-433b31: #433b31;
+  --tone-line-453829: #453829;
+  --tone-line-463c2e: #463c2e;
+  --tone-line-4b4132: #4b4132;
+  --tone-line-504232: #504232;
+  --tone-line-514433: #514433;
+  --tone-line-534737: #534737;
+  --tone-line-544029: #544029;
+  --tone-line-57412b: #57412b;
+  --tone-line-5a4631: #5a4631;
+  --tone-line-5b4935: #5b4935;
+  --tone-line-5c5237: #5c5237;
+  --tone-line-5e4830: #5e4830;
+  --tone-line-634a2f: #634a2f;
+  --tone-line-665139: #665139;
+  --tone-line-6c5135: #6c5135;
+  --tone-line-6d5b4e: #6d5b4e;
+  --tone-line-726044: #726044;
+  --tone-line-76634b: #76634b;
+  --tone-line-795e3f: #795e3f;
+  --tone-line-796147: #796147;
+  --tone-line-7b5d3855: #7b5d3855;
+  --tone-line-7d6040: #7d6040;
+  --tone-line-805d3d: #805d3d;
+  --tone-line-9a6f4266: #9a6f4266;
+  --tone-line-9a744e: #9a744e;
+  --tone-line-9b724666: #9b724666;
+  --tone-line-9c744c: #9c744c;
+  --tone-line-9c7854: #9c7854;
+  --tone-line-9e7958: #9e7958;
+  --tone-line-a77e57: #a77e57;
+  --tone-line-bc986c: #bc986c;
+  --tone-line-bd915f: #bd915f;
+  --tone-line-c58a55: #c58a55;
+  --tone-line-c99b6b: #c99b6b;
+  --tone-line-dda46f: #dda46f;
+  --tone-line-e0bc94: #e0bc94;
+  --tone-line-e2b78e: #e2b78e;
+  --tone-line-e9be8e: #e9be8e;
+  --tone-line-edc79f: #edc79f;
+  --tone-line-ffffff13: #ffffff13;
+  --tone-line-ffffff20: #ffffff20;
+  --tone-surface-000a: #000a;
+  --tone-surface-050505bb: #050505bb;
+  --tone-surface-050505eb: #050505eb;
+  --tone-surface-050505ed: #050505ed;
+  --tone-surface-070a0d: #070a0d;
+  --tone-surface-080908: #080908;
+  --tone-surface-080909: #080909;
+  --tone-surface-080a0b: #080a0b;
+  --tone-surface-090908: #090908;
+  --tone-surface-090a08ed: #090a08ed;
+  --tone-surface-090d12: #090d12;
+  --tone-surface-0a0b0af5: #0a0b0af5;
+  --tone-surface-0b0c0bdb: #0b0c0bdb;
+  --tone-surface-0d0e0d: #0d0e0d;
+  --tone-surface-0d100eea: #0d100eea;
+  --tone-surface-0d100f: #0d100f;
+  --tone-surface-10110f: #10110f;
+  --tone-surface-10120f: #10120f;
+  --tone-surface-101210: #101210;
+  --tone-surface-10151acc: #10151acc;
+  --tone-surface-11120f: #11120f;
+  --tone-surface-11140f: #11140f;
+  --tone-surface-111410: #111410;
+  --tone-surface-12120ff5: #12120ff5;
+  --tone-surface-14120f: #14120f;
+  --tone-surface-141512: #141512;
+  --tone-surface-15120ce8: #15120ce8;
+  --tone-surface-15130f: #15130f;
+  --tone-surface-151a20: #151a20;
+  --tone-surface-16130f: #16130f;
+  --tone-surface-161411: #161411;
+  --tone-surface-171510f2: #171510f2;
+  --tone-surface-171814: #171814;
+  --tone-surface-171914d9: #171914d9;
+  --tone-surface-171915: #171915;
+  --tone-surface-172820: #172820;
+  --tone-surface-181613: #181613;
+  --tone-surface-191712: #191712;
+  --tone-surface-191a15: #191a15;
+  --tone-surface-191b17: #191b17;
+  --tone-surface-1b1712: #1b1712;
+  --tone-surface-1b1b19: #1b1b19;
+  --tone-surface-202015: #202015;
+  --tone-surface-202024: #202024;
+  --tone-surface-211b14: #211b14;
+  --tone-surface-211c16: #211c16;
+  --tone-surface-2a2016: #2a2016;
+  --tone-surface-302317: #302317;
+  --tone-surface-321b17: #321b17;
+  --tone-surface-32271877: #32271877;
+  --tone-surface-33281c: #33281c;
+  --tone-surface-34291d: #34291d;
+  --tone-surface-343029: #343029;
+  --tone-surface-352719: #352719;
+  --tone-surface-37241455: #37241455;
+  --tone-surface-37291c: #37291c;
+  --tone-surface-37291d: #37291d;
+  --tone-surface-443b2d66: #443b2d66;
+  --tone-surface-4a3423: #4a3423;
+  --tone-surface-54331945: #54331945;
+  --tone-surface-765035: #765035;
+  --tone-surface-765536: #765536;
+  --tone-surface-7b6549: #7b6549;
+  --tone-surface-826441: #826441;
+  --tone-surface-846744: #846744;
+  --tone-surface-9aa7ad: #9aa7ad;
+  --tone-surface-9f815b: #9f815b;
+  --tone-surface-c4905309: #c4905309;
+  --tone-surface-c49053ad: #c49053ad;
+  --tone-surface-c4a37b: #c4a37b;
+  --tone-surface-cf9d63: #cf9d63;
+  --tone-surface-d3a06b: #d3a06b;
+  --tone-surface-d9a776: #d9a776;
+  --tone-surface-deb086: #deb086;
+  --tone-surface-eee4d4: #eee4d4;
+  --tone-surface-rgba161820075: rgba(16, 18, 20, 0.75);
+  --tone-surface-rgba5710098: rgba(5, 7, 10, 0.98);
+}
+:root[data-theme="light"] {
+  color-scheme: light;
+  --menu-surface-rgb: 246, 242, 233;
+  --theme-focus: #925a30;
+  --space-bg: #f6f2e9;
+  --space-surface: #ede7dc;
+  --space-ink: #292621;
+  --space-text: #49443d;
+  --space-muted: #696157;
+  --space-line: #d6cebf;
+  --space-copper: #c58a55;
+  --space-blue: #376675;
+  --tone-ink-080a0b: #080a0b;
+  --tone-ink-100c08: #100c08;
+  --tone-ink-100d09: #100d09;
+  --tone-ink-140e09: #140e09;
+  --tone-ink-18140f: #18140f;
+  --tone-ink-354e60: #3e5b70;
+  --tone-ink-536e81: #445a6a;
+  --tone-ink-607f95: #445a69;
+  --tone-ink-658aa2: #415b6c;
+  --tone-ink-776248: #6c5941;
+  --tone-ink-7f8075: #55554e;
+  --tone-ink-809bad: #445a69;
+  --tone-ink-897d6d: #5b5348;
+  --tone-ink-8dabb8: #435f6b;
+  --tone-ink-918674: #5b5448;
+  --tone-ink-938b7f: #59534b;
+  --tone-ink-958674: #5d5347;
+  --tone-ink-9b907f: #5c5448;
+  --tone-ink-9f9382: #5c5347;
+  --tone-ink-a09483: #5c5347;
+  --tone-ink-a1917d: #5f5344;
+  --tone-ink-a19685: #5c5447;
+  --tone-ink-a39787: #5c5347;
+  --tone-ink-a69b8a: #5d5447;
+  --tone-ink-a79d8b: #5d5546;
+  --tone-ink-a7acae: #4e5355;
+  --tone-ink-a89b88: #5e5445;
+  --tone-ink-a89c8a: #5e5446;
+  --tone-ink-a99880: #615442;
+  --tone-ink-a99a84: #605443;
+  --tone-ink-a99c89: #5e5445;
+  --tone-ink-aa8158: #73573a;
+  --tone-ink-aa9984: #615343;
+  --tone-ink-ab9b83: #615542;
+  --tone-ink-ac9a7f: #695a44;
+  --tone-ink-aca08e: #5e5445;
+  --tone-ink-aca8a2: #56534d;
+  --tone-ink-ad8053: #755738;
+  --tone-ink-af906c: #70593d;
+  --tone-ink-afa497: #5c5247;
+  --tone-ink-b09c83: #6a5943;
+  --tone-ink-b0a18e: #605343;
+  --tone-ink-b1a591: #5f5544;
+  --tone-ink-b3a795: #5f5444;
+  --tone-ink-b3aa9c: #5c5447;
+  --tone-ink-b3c4a4: #566944;
+  --tone-ink-b4946f: #72593b;
+  --tone-ink-b49a7f: #6d5740;
+  --tone-ink-b4a792: #615543;
+  --tone-ink-b5a792: #615542;
+  --tone-ink-b6a58e: #695944;
+  --tone-ink-b78a5f: #785636;
+  --tone-ink-b79469: #755a38;
+  --tone-ink-b7d4bc: #416d48;
+  --tone-ink-b8ac9c: #5f5444;
+  --tone-ink-b9a28d: #6b5642;
+  --tone-ink-b9a48b: #6c5941;
+  --tone-ink-b9a88f: #6b5b43;
+  --tone-ink-b9aa98: #615342;
+  --tone-ink-b9ad9a: #605543;
+  --tone-ink-bdab91: #6c5b41;
+  --tone-ink-bdb19b: #685c45;
+  --tone-ink-bfa080: #73573a;
+  --tone-ink-bfb39e: #685c45;
+  --tone-ink-bfb4a1: #615642;
+  --tone-ink-c2b8a8: #605543;
+  --tone-ink-c39c6f: #7a5933;
+  --tone-ink-c3b7a4: #685b45;
+  --tone-ink-c3b9aa: #605444;
+  --tone-ink-c4b9a6: #685b45;
+  --tone-ink-c58a55: #80542d;
+  --tone-ink-c5b8a8: #685845;
+  --tone-ink-c5bba9: #615642;
+  --tone-ink-c5bcad: #605544;
+  --tone-ink-c6bba9: #685b45;
+  --tone-ink-c7a888: #765737;
+  --tone-ink-c7b398: #705b3d;
+  --tone-ink-c7c1b8: #5b5448;
+  --tone-ink-c8bdaa: #695c44;
+  --tone-ink-c99b6b: #7f582e;
+  --tone-ink-c9a779: #7c5c32;
+  --tone-ink-cab79d: #715b3d;
+  --tone-ink-ceb18f: #795935;
+  --tone-ink-d0bfa9: #705a3d;
+  --tone-ink-d0c1ac: #6f5b3f;
+  --tone-ink-d0c7b8: #685b45;
+  --tone-ink-d1c6b4: #6b5c42;
+  --tone-ink-d3b489: #7e5d2f;
+  --tone-ink-d3ccbf: #615642;
+  --tone-ink-d5aa7e: #80572d;
+  --tone-ink-d6a879: #80572d;
+  --tone-ink-d6aa78: #80592d;
+  --tone-ink-d7a16a: #80572d;
+  --tone-ink-d7b388: #805a2d;
+  --tone-ink-d7ccbd: #6c5a41;
+  --tone-ink-d7cfc0: #6a5d43;
+  --tone-ink-d8b288: #80592d;
+  --tone-ink-d8b28a: #80582d;
+  --tone-ink-d8b88f: #805c2d;
+  --tone-ink-d8c1a1: #7b5d33;
+  --tone-ink-d9c8af: #765d38;
+  --tone-ink-dabc94: #805d2d;
+  --tone-ink-ddb58b: #80582d;
+  --tone-ink-deb48c: #80562d;
+  --tone-ink-dec49f: #805e2d;
+  --tone-ink-dec4a1: #805d2d;
+  --tone-ink-dec7a9: #7d5c30;
+  --tone-ink-e0c5a1: #805d2d;
+  --tone-ink-e0d6c5: #715e3c;
+  --tone-ink-e1a493: #803f2d;
+  --tone-ink-e2c195: #805d2d;
+  --tone-ink-e4b583: #80582d;
+  --tone-ink-e4c5a2: #80592d;
+  --tone-ink-e6c8a1: #805c2d;
+  --tone-ink-e9ac99: #80412d;
+  --tone-ink-e9e5dc: #6a5e43;
+  --tone-ink-eac591: #805e2d;
+  --tone-ink-eddbc1: #805e2d;
+  --tone-ink-eed0a5: #805e2d;
+  --tone-ink-eed5b0: #805f2d;
+  --tone-ink-eee6d8: #796035;
+  --tone-ink-eee7d9: #786236;
+  --tone-ink-efb0a0: #803e2d;
+  --tone-ink-efb0a2: #803c2d;
+  --tone-ink-efd6b6: #805c2d;
+  --tone-ink-efe8db: #786135;
+  --tone-ink-f0d2aa: #805d2d;
+  --tone-ink-f0d5b3: #805b2d;
+  --tone-ink-f0e4d3: #805e2d;
+  --tone-ink-f2b799: #80492d;
+  --tone-ink-f3cca4: #80572d;
+  --tone-ink-f3d9b4: #805e2d;
+  --tone-ink-fff1db: #80602d;
+  --tone-ink-fff2d8: #80652d;
+  --tone-ink-fff5e7: #805e2d;
+  --tone-line-2e2b24: #c3beb2;
+  --tone-line-302b24: #c4bcb0;
+  --tone-line-302c25: #c3bdb1;
+  --tone-line-383025: #c8bcac;
+  --tone-line-393024: #cabcab;
+  --tone-line-393229: #c5bcaf;
+  --tone-line-393329: #c5bdaf;
+  --tone-line-40392f: #c5bcb0;
+  --tone-line-405040: #b2c2b2;
+  --tone-line-423626: #cdbda8;
+  --tone-line-433b31: #c5bbaf;
+  --tone-line-453829: #ccbba9;
+  --tone-line-463c2e: #c8bdac;
+  --tone-line-4b4132: #c8bdac;
+  --tone-line-504232: #cabbaa;
+  --tone-line-514433: #cabcab;
+  --tone-line-534737: #c8bcac;
+  --tone-line-544029: #cfbca5;
+  --tone-line-57412b: #cfbaa5;
+  --tone-line-5a4631: #cebba6;
+  --tone-line-5b4935: #ccbba8;
+  --tone-line-5c5237: #cbc2a9;
+  --tone-line-5e4830: #cfbba5;
+  --tone-line-634a2f: #cfbba5;
+  --tone-line-665139: #cebba7;
+  --tone-line-6c5135: #cfbba5;
+  --tone-line-6d5b4e: #c6b8af;
+  --tone-line-726044: #ccbea9;
+  --tone-line-76634b: #c9bcab;
+  --tone-line-795e3f: #cfbca5;
+  --tone-line-796147: #ccbba8;
+  --tone-line-7b5d3855: #cfbca555;
+  --tone-line-7d6040: #cfbba5;
+  --tone-line-805d3d: #cfb9a5;
+  --tone-line-9a6f4266: #cfbba566;
+  --tone-line-9a744e: #ab8763;
+  --tone-line-9b724666: #cfbba566;
+  --tone-line-9c744c: #ab8763;
+  --tone-line-9c7854: #ab8763;
+  --tone-line-9e7958: #a98565;
+  --tone-line-a77e57: #ab8663;
+  --tone-line-bc986c: #ab8b63;
+  --tone-line-bd915f: #ab8963;
+  --tone-line-c58a55: #ab8563;
+  --tone-line-c99b6b: #ab8863;
+  --tone-line-dda46f: #ab8663;
+  --tone-line-e0bc94: #ab8963;
+  --tone-line-e2b78e: #ab8663;
+  --tone-line-e9be8e: #ab8963;
+  --tone-line-edc79f: #ab8863;
+  --tone-line-ffffff13: #87878713;
+  --tone-line-ffffff20: #87878720;
+  --tone-surface-000a: #f6f2e9aa;
+  --tone-surface-050505bb: #f5f1e8bb;
+  --tone-surface-050505eb: #f5f1e8eb;
+  --tone-surface-050505ed: #f5f1e8ed;
+  --tone-surface-070a0d: #f4f0e7;
+  --tone-surface-080908: #f4f0e7;
+  --tone-surface-080909: #f4f0e7;
+  --tone-surface-080a0b: #f4f0e7;
+  --tone-surface-090908: #f4f0e7;
+  --tone-surface-090a08ed: #f4f0e7ed;
+  --tone-surface-090d12: #f3efe6;
+  --tone-surface-0a0b0af5: #f4f0e7f5;
+  --tone-surface-0b0c0bdb: #f4efe6db;
+  --tone-surface-0d0e0d: #f3efe6;
+  --tone-surface-0d100eea: #f3efe6ea;
+  --tone-surface-0d100f: #f3efe6;
+  --tone-surface-10110f: #f3eee5;
+  --tone-surface-10120f: #f2eee5;
+  --tone-surface-101210: #f2eee5;
+  --tone-surface-10151acc: #f2ede4cc;
+  --tone-surface-11120f: #f2eee5;
+  --tone-surface-11140f: #f2eee5;
+  --tone-surface-111410: #f2eee5;
+  --tone-surface-12120ff5: #f2eee5f5;
+  --tone-surface-14120f: #f2eee5;
+  --tone-surface-141512: #f2ede4;
+  --tone-surface-15120ce8: #f2eee5e8;
+  --tone-surface-15130f: #f2eee5;
+  --tone-surface-151a20: #f0ece3;
+  --tone-surface-16130f: #f2eee5;
+  --tone-surface-161411: #f2ede4;
+  --tone-surface-171510f2: #f2ede4f2;
+  --tone-surface-171814: #f1ede4;
+  --tone-surface-171914d9: #f1ede4d9;
+  --tone-surface-171915: #f1ede4;
+  --tone-surface-172820: #efebe2;
+  --tone-surface-181613: #f1ede4;
+  --tone-surface-191712: #f1ede4;
+  --tone-surface-191a15: #f1ede4;
+  --tone-surface-191b17: #f1ece3;
+  --tone-surface-1b1712: #f1ede4;
+  --tone-surface-1b1b19: #f0ece3;
+  --tone-surface-202015: #f0ece3;
+  --tone-surface-202024: #efeae1;
+  --tone-surface-211b14: #f0ece3;
+  --tone-surface-211c16: #f0ece3;
+  --tone-surface-2a2016: #efebe2;
+  --tone-surface-302317: #eeeae1;
+  --tone-surface-321b17: #eee0dd;
+  --tone-surface-32271877: #eee9e077;
+  --tone-surface-33281c: #eee9e0;
+  --tone-surface-34291d: #ede9e0;
+  --tone-surface-343029: #ece7de;
+  --tone-surface-352719: #eee9e0;
+  --tone-surface-37241455: #eee5dd55;
+  --tone-surface-37291c: #ede8df;
+  --tone-surface-37291d: #ede8df;
+  --tone-surface-443b2d66: #ebe7e066;
+  --tone-surface-4a3423: #eae5dc;
+  --tone-surface-54331945: #eee5dd45;
+  --tone-surface-765035: #eee4dd;
+  --tone-surface-765536: #eee5dd;
+  --tone-surface-7b6549: #ece6df;
+  --tone-surface-826441: #eee6dd;
+  --tone-surface-846744: #eee6dd;
+  --tone-surface-9aa7ad: #ccd3d6;
+  --tone-surface-9f815b: #ded3c5;
+  --tone-surface-c4905309: #c4905309;
+  --tone-surface-c49053ad: #c49053ad;
+  --tone-surface-c4a37b: #c4a37b;
+  --tone-surface-cf9d63: #cf9d63;
+  --tone-surface-d3a06b: #d3a06b;
+  --tone-surface-d9a776: #d9a776;
+  --tone-surface-deb086: #deb086;
+  --tone-surface-eee4d4: #eee4d4;
+  --tone-surface-rgba161820075: #f2eee5bf;
+  --tone-surface-rgba5710098: #f4f0e7fa;
+}
+html {
+  transition:
+    --space-bg var(--theme-duration) ease,
+    --space-surface var(--theme-duration) ease,
+    --space-ink var(--theme-duration) ease,
+    --space-text var(--theme-duration) ease,
+    --space-muted var(--theme-duration) ease,
+    --space-line var(--theme-duration) ease,
+    --space-copper var(--theme-duration) ease,
+    --space-blue var(--theme-duration) ease,
+    --tone-ink-080a0b var(--theme-duration) ease,
+    --tone-ink-100c08 var(--theme-duration) ease,
+    --tone-ink-100d09 var(--theme-duration) ease,
+    --tone-ink-140e09 var(--theme-duration) ease,
+    --tone-ink-18140f var(--theme-duration) ease,
+    --tone-ink-354e60 var(--theme-duration) ease,
+    --tone-ink-536e81 var(--theme-duration) ease,
+    --tone-ink-607f95 var(--theme-duration) ease,
+    --tone-ink-658aa2 var(--theme-duration) ease,
+    --tone-ink-776248 var(--theme-duration) ease,
+    --tone-ink-7f8075 var(--theme-duration) ease,
+    --tone-ink-809bad var(--theme-duration) ease,
+    --tone-ink-897d6d var(--theme-duration) ease,
+    --tone-ink-8dabb8 var(--theme-duration) ease,
+    --tone-ink-918674 var(--theme-duration) ease,
+    --tone-ink-938b7f var(--theme-duration) ease,
+    --tone-ink-958674 var(--theme-duration) ease,
+    --tone-ink-9b907f var(--theme-duration) ease,
+    --tone-ink-9f9382 var(--theme-duration) ease,
+    --tone-ink-a09483 var(--theme-duration) ease,
+    --tone-ink-a1917d var(--theme-duration) ease,
+    --tone-ink-a19685 var(--theme-duration) ease,
+    --tone-ink-a39787 var(--theme-duration) ease,
+    --tone-ink-a69b8a var(--theme-duration) ease,
+    --tone-ink-a79d8b var(--theme-duration) ease,
+    --tone-ink-a7acae var(--theme-duration) ease,
+    --tone-ink-a89b88 var(--theme-duration) ease,
+    --tone-ink-a89c8a var(--theme-duration) ease,
+    --tone-ink-a99880 var(--theme-duration) ease,
+    --tone-ink-a99a84 var(--theme-duration) ease,
+    --tone-ink-a99c89 var(--theme-duration) ease,
+    --tone-ink-aa8158 var(--theme-duration) ease,
+    --tone-ink-aa9984 var(--theme-duration) ease,
+    --tone-ink-ab9b83 var(--theme-duration) ease,
+    --tone-ink-ac9a7f var(--theme-duration) ease,
+    --tone-ink-aca08e var(--theme-duration) ease,
+    --tone-ink-aca8a2 var(--theme-duration) ease,
+    --tone-ink-ad8053 var(--theme-duration) ease,
+    --tone-ink-af906c var(--theme-duration) ease,
+    --tone-ink-afa497 var(--theme-duration) ease,
+    --tone-ink-b09c83 var(--theme-duration) ease,
+    --tone-ink-b0a18e var(--theme-duration) ease,
+    --tone-ink-b1a591 var(--theme-duration) ease,
+    --tone-ink-b3a795 var(--theme-duration) ease,
+    --tone-ink-b3aa9c var(--theme-duration) ease,
+    --tone-ink-b3c4a4 var(--theme-duration) ease,
+    --tone-ink-b4946f var(--theme-duration) ease,
+    --tone-ink-b49a7f var(--theme-duration) ease,
+    --tone-ink-b4a792 var(--theme-duration) ease,
+    --tone-ink-b5a792 var(--theme-duration) ease,
+    --tone-ink-b6a58e var(--theme-duration) ease,
+    --tone-ink-b78a5f var(--theme-duration) ease,
+    --tone-ink-b79469 var(--theme-duration) ease,
+    --tone-ink-b7d4bc var(--theme-duration) ease,
+    --tone-ink-b8ac9c var(--theme-duration) ease,
+    --tone-ink-b9a28d var(--theme-duration) ease,
+    --tone-ink-b9a48b var(--theme-duration) ease,
+    --tone-ink-b9a88f var(--theme-duration) ease,
+    --tone-ink-b9aa98 var(--theme-duration) ease,
+    --tone-ink-b9ad9a var(--theme-duration) ease,
+    --tone-ink-bdab91 var(--theme-duration) ease,
+    --tone-ink-bdb19b var(--theme-duration) ease,
+    --tone-ink-bfa080 var(--theme-duration) ease,
+    --tone-ink-bfb39e var(--theme-duration) ease,
+    --tone-ink-bfb4a1 var(--theme-duration) ease,
+    --tone-ink-c2b8a8 var(--theme-duration) ease,
+    --tone-ink-c39c6f var(--theme-duration) ease,
+    --tone-ink-c3b7a4 var(--theme-duration) ease,
+    --tone-ink-c3b9aa var(--theme-duration) ease,
+    --tone-ink-c4b9a6 var(--theme-duration) ease,
+    --tone-ink-c58a55 var(--theme-duration) ease,
+    --tone-ink-c5b8a8 var(--theme-duration) ease,
+    --tone-ink-c5bba9 var(--theme-duration) ease,
+    --tone-ink-c5bcad var(--theme-duration) ease,
+    --tone-ink-c6bba9 var(--theme-duration) ease,
+    --tone-ink-c7a888 var(--theme-duration) ease,
+    --tone-ink-c7b398 var(--theme-duration) ease,
+    --tone-ink-c7c1b8 var(--theme-duration) ease,
+    --tone-ink-c8bdaa var(--theme-duration) ease,
+    --tone-ink-c99b6b var(--theme-duration) ease,
+    --tone-ink-c9a779 var(--theme-duration) ease,
+    --tone-ink-cab79d var(--theme-duration) ease,
+    --tone-ink-ceb18f var(--theme-duration) ease,
+    --tone-ink-d0bfa9 var(--theme-duration) ease,
+    --tone-ink-d0c1ac var(--theme-duration) ease,
+    --tone-ink-d0c7b8 var(--theme-duration) ease,
+    --tone-ink-d1c6b4 var(--theme-duration) ease,
+    --tone-ink-d3b489 var(--theme-duration) ease,
+    --tone-ink-d3ccbf var(--theme-duration) ease,
+    --tone-ink-d5aa7e var(--theme-duration) ease,
+    --tone-ink-d6a879 var(--theme-duration) ease,
+    --tone-ink-d6aa78 var(--theme-duration) ease,
+    --tone-ink-d7a16a var(--theme-duration) ease,
+    --tone-ink-d7b388 var(--theme-duration) ease,
+    --tone-ink-d7ccbd var(--theme-duration) ease,
+    --tone-ink-d7cfc0 var(--theme-duration) ease,
+    --tone-ink-d8b288 var(--theme-duration) ease,
+    --tone-ink-d8b28a var(--theme-duration) ease,
+    --tone-ink-d8b88f var(--theme-duration) ease,
+    --tone-ink-d8c1a1 var(--theme-duration) ease,
+    --tone-ink-d9c8af var(--theme-duration) ease,
+    --tone-ink-dabc94 var(--theme-duration) ease,
+    --tone-ink-ddb58b var(--theme-duration) ease,
+    --tone-ink-deb48c var(--theme-duration) ease,
+    --tone-ink-dec49f var(--theme-duration) ease,
+    --tone-ink-dec4a1 var(--theme-duration) ease,
+    --tone-ink-dec7a9 var(--theme-duration) ease,
+    --tone-ink-e0c5a1 var(--theme-duration) ease,
+    --tone-ink-e0d6c5 var(--theme-duration) ease,
+    --tone-ink-e1a493 var(--theme-duration) ease,
+    --tone-ink-e2c195 var(--theme-duration) ease,
+    --tone-ink-e4b583 var(--theme-duration) ease,
+    --tone-ink-e4c5a2 var(--theme-duration) ease,
+    --tone-ink-e6c8a1 var(--theme-duration) ease,
+    --tone-ink-e9ac99 var(--theme-duration) ease,
+    --tone-ink-e9e5dc var(--theme-duration) ease,
+    --tone-ink-eac591 var(--theme-duration) ease,
+    --tone-ink-eddbc1 var(--theme-duration) ease,
+    --tone-ink-eed0a5 var(--theme-duration) ease,
+    --tone-ink-eed5b0 var(--theme-duration) ease,
+    --tone-ink-eee6d8 var(--theme-duration) ease,
+    --tone-ink-eee7d9 var(--theme-duration) ease,
+    --tone-ink-efb0a0 var(--theme-duration) ease,
+    --tone-ink-efb0a2 var(--theme-duration) ease,
+    --tone-ink-efd6b6 var(--theme-duration) ease,
+    --tone-ink-efe8db var(--theme-duration) ease,
+    --tone-ink-f0d2aa var(--theme-duration) ease,
+    --tone-ink-f0d5b3 var(--theme-duration) ease,
+    --tone-ink-f0e4d3 var(--theme-duration) ease,
+    --tone-ink-f2b799 var(--theme-duration) ease,
+    --tone-ink-f3cca4 var(--theme-duration) ease,
+    --tone-ink-f3d9b4 var(--theme-duration) ease,
+    --tone-ink-fff1db var(--theme-duration) ease,
+    --tone-ink-fff2d8 var(--theme-duration) ease,
+    --tone-ink-fff5e7 var(--theme-duration) ease,
+    --tone-line-2e2b24 var(--theme-duration) ease,
+    --tone-line-302b24 var(--theme-duration) ease,
+    --tone-line-302c25 var(--theme-duration) ease,
+    --tone-line-383025 var(--theme-duration) ease,
+    --tone-line-393024 var(--theme-duration) ease,
+    --tone-line-393229 var(--theme-duration) ease,
+    --tone-line-393329 var(--theme-duration) ease,
+    --tone-line-40392f var(--theme-duration) ease,
+    --tone-line-405040 var(--theme-duration) ease,
+    --tone-line-423626 var(--theme-duration) ease,
+    --tone-line-433b31 var(--theme-duration) ease,
+    --tone-line-453829 var(--theme-duration) ease,
+    --tone-line-463c2e var(--theme-duration) ease,
+    --tone-line-4b4132 var(--theme-duration) ease,
+    --tone-line-504232 var(--theme-duration) ease,
+    --tone-line-514433 var(--theme-duration) ease,
+    --tone-line-534737 var(--theme-duration) ease,
+    --tone-line-544029 var(--theme-duration) ease,
+    --tone-line-57412b var(--theme-duration) ease,
+    --tone-line-5a4631 var(--theme-duration) ease,
+    --tone-line-5b4935 var(--theme-duration) ease,
+    --tone-line-5c5237 var(--theme-duration) ease,
+    --tone-line-5e4830 var(--theme-duration) ease,
+    --tone-line-634a2f var(--theme-duration) ease,
+    --tone-line-665139 var(--theme-duration) ease,
+    --tone-line-6c5135 var(--theme-duration) ease,
+    --tone-line-6d5b4e var(--theme-duration) ease,
+    --tone-line-726044 var(--theme-duration) ease,
+    --tone-line-76634b var(--theme-duration) ease,
+    --tone-line-795e3f var(--theme-duration) ease,
+    --tone-line-796147 var(--theme-duration) ease,
+    --tone-line-7b5d3855 var(--theme-duration) ease,
+    --tone-line-7d6040 var(--theme-duration) ease,
+    --tone-line-805d3d var(--theme-duration) ease,
+    --tone-line-9a6f4266 var(--theme-duration) ease,
+    --tone-line-9a744e var(--theme-duration) ease,
+    --tone-line-9b724666 var(--theme-duration) ease,
+    --tone-line-9c744c var(--theme-duration) ease,
+    --tone-line-9c7854 var(--theme-duration) ease,
+    --tone-line-9e7958 var(--theme-duration) ease,
+    --tone-line-a77e57 var(--theme-duration) ease,
+    --tone-line-bc986c var(--theme-duration) ease,
+    --tone-line-bd915f var(--theme-duration) ease,
+    --tone-line-c58a55 var(--theme-duration) ease,
+    --tone-line-c99b6b var(--theme-duration) ease,
+    --tone-line-dda46f var(--theme-duration) ease,
+    --tone-line-e0bc94 var(--theme-duration) ease,
+    --tone-line-e2b78e var(--theme-duration) ease,
+    --tone-line-e9be8e var(--theme-duration) ease,
+    --tone-line-edc79f var(--theme-duration) ease,
+    --tone-line-ffffff13 var(--theme-duration) ease,
+    --tone-line-ffffff20 var(--theme-duration) ease,
+    --tone-surface-000a var(--theme-duration) ease,
+    --tone-surface-050505bb var(--theme-duration) ease,
+    --tone-surface-050505eb var(--theme-duration) ease,
+    --tone-surface-050505ed var(--theme-duration) ease,
+    --tone-surface-070a0d var(--theme-duration) ease,
+    --tone-surface-080908 var(--theme-duration) ease,
+    --tone-surface-080909 var(--theme-duration) ease,
+    --tone-surface-080a0b var(--theme-duration) ease,
+    --tone-surface-090908 var(--theme-duration) ease,
+    --tone-surface-090a08ed var(--theme-duration) ease,
+    --tone-surface-090d12 var(--theme-duration) ease,
+    --tone-surface-0a0b0af5 var(--theme-duration) ease,
+    --tone-surface-0b0c0bdb var(--theme-duration) ease,
+    --tone-surface-0d0e0d var(--theme-duration) ease,
+    --tone-surface-0d100eea var(--theme-duration) ease,
+    --tone-surface-0d100f var(--theme-duration) ease,
+    --tone-surface-10110f var(--theme-duration) ease,
+    --tone-surface-10120f var(--theme-duration) ease,
+    --tone-surface-101210 var(--theme-duration) ease,
+    --tone-surface-10151acc var(--theme-duration) ease,
+    --tone-surface-11120f var(--theme-duration) ease,
+    --tone-surface-11140f var(--theme-duration) ease,
+    --tone-surface-111410 var(--theme-duration) ease,
+    --tone-surface-12120ff5 var(--theme-duration) ease,
+    --tone-surface-14120f var(--theme-duration) ease,
+    --tone-surface-141512 var(--theme-duration) ease,
+    --tone-surface-15120ce8 var(--theme-duration) ease,
+    --tone-surface-15130f var(--theme-duration) ease,
+    --tone-surface-151a20 var(--theme-duration) ease,
+    --tone-surface-16130f var(--theme-duration) ease,
+    --tone-surface-161411 var(--theme-duration) ease,
+    --tone-surface-171510f2 var(--theme-duration) ease,
+    --tone-surface-171814 var(--theme-duration) ease,
+    --tone-surface-171914d9 var(--theme-duration) ease,
+    --tone-surface-171915 var(--theme-duration) ease,
+    --tone-surface-172820 var(--theme-duration) ease,
+    --tone-surface-181613 var(--theme-duration) ease,
+    --tone-surface-191712 var(--theme-duration) ease,
+    --tone-surface-191a15 var(--theme-duration) ease,
+    --tone-surface-191b17 var(--theme-duration) ease,
+    --tone-surface-1b1712 var(--theme-duration) ease,
+    --tone-surface-1b1b19 var(--theme-duration) ease,
+    --tone-surface-202015 var(--theme-duration) ease,
+    --tone-surface-202024 var(--theme-duration) ease,
+    --tone-surface-211b14 var(--theme-duration) ease,
+    --tone-surface-211c16 var(--theme-duration) ease,
+    --tone-surface-2a2016 var(--theme-duration) ease,
+    --tone-surface-302317 var(--theme-duration) ease,
+    --tone-surface-321b17 var(--theme-duration) ease,
+    --tone-surface-32271877 var(--theme-duration) ease,
+    --tone-surface-33281c var(--theme-duration) ease,
+    --tone-surface-34291d var(--theme-duration) ease,
+    --tone-surface-343029 var(--theme-duration) ease,
+    --tone-surface-352719 var(--theme-duration) ease,
+    --tone-surface-37241455 var(--theme-duration) ease,
+    --tone-surface-37291c var(--theme-duration) ease,
+    --tone-surface-37291d var(--theme-duration) ease,
+    --tone-surface-443b2d66 var(--theme-duration) ease,
+    --tone-surface-4a3423 var(--theme-duration) ease,
+    --tone-surface-54331945 var(--theme-duration) ease,
+    --tone-surface-765035 var(--theme-duration) ease,
+    --tone-surface-765536 var(--theme-duration) ease,
+    --tone-surface-7b6549 var(--theme-duration) ease,
+    --tone-surface-826441 var(--theme-duration) ease,
+    --tone-surface-846744 var(--theme-duration) ease,
+    --tone-surface-9aa7ad var(--theme-duration) ease,
+    --tone-surface-9f815b var(--theme-duration) ease,
+    --tone-surface-c4905309 var(--theme-duration) ease,
+    --tone-surface-c49053ad var(--theme-duration) ease,
+    --tone-surface-c4a37b var(--theme-duration) ease,
+    --tone-surface-cf9d63 var(--theme-duration) ease,
+    --tone-surface-d3a06b var(--theme-duration) ease,
+    --tone-surface-d9a776 var(--theme-duration) ease,
+    --tone-surface-deb086 var(--theme-duration) ease,
+    --tone-surface-eee4d4 var(--theme-duration) ease,
+    --tone-surface-rgba161820075 var(--theme-duration) ease,
+    --tone-surface-rgba5710098 var(--theme-duration) ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --theme-duration: 80ms;
+  }
+}

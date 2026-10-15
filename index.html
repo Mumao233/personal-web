@@ -1,9 +1,18 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="zh-CN" data-theme="dark">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#050505" />
+    <script>
+      // Apply only an explicit preference before styles paint; dark is the default.
+      try {
+        const theme = localStorage.getItem("personal-space-theme") === "light" ? "light" : "dark";
+        document.documentElement.dataset.theme = theme;
+        document.documentElement.style.colorScheme = theme;
+        document.querySelector('meta[name="theme-color"]').content = theme === "light" ? "#f6f2e9" : "#050505";
+      } catch {}
+    </script>
     <meta
       name="description"
       content="林珈诚的个人空间。学习、作品、文字，以及对世界的持续观察。"

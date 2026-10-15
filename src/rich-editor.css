@@ -4,9 +4,9 @@
   --editor-accent: #c99b6b;
   border: 1px solid var(--editor-line);
   border-radius: 12px;
-  background: #0d100f;
+  background: var(--tone-surface-0d100f);
   margin: 12px 0 24px;
-  color: #e7e1d5;
+  color: var(--space-ink);
   overflow: clip;
 }
 .rich-editor-toolbar {
@@ -16,7 +16,7 @@
   gap: 4px;
   padding: 10px;
   border-bottom: 1px solid var(--editor-line);
-  background: #171915;
+  background: var(--tone-surface-171915);
 }
 .rich-editor-toolbar button,
 .rich-image-layout button,
@@ -33,9 +33,9 @@
 }
 .rich-editor button:hover:not(:disabled),
 .rich-editor button.is-active {
-  color: #f3d9b4;
-  border-color: #796147;
-  background: #37291d;
+  color: var(--tone-ink-f3d9b4);
+  border-color: var(--tone-line-796147);
+  background: var(--tone-surface-37291d);
 }
 .rich-editor button:disabled {
   opacity: 0.35;
@@ -43,9 +43,9 @@
 .rich-editor select {
   width: auto;
   min-height: 36px;
-  color: #e7e1d5;
-  background: #111410;
-  border: 1px solid #534737;
+  color: var(--space-ink);
+  background: var(--tone-surface-111410);
+  border: 1px solid var(--tone-line-534737);
   border-radius: 5px;
   padding: 5px 8px;
   margin: 0;
@@ -70,7 +70,7 @@
   outline: none;
 }
 .rich-editor:focus-within {
-  border-color: #9a744e;
+  border-color: var(--tone-line-9a744e);
 }
 .rich-editor-document > :first-child {
   margin-top: 0;
@@ -84,7 +84,7 @@
   line-height: inherit;
 }
 .rich-editor-document:has(> p:only-child > .ProseMirror-trailingBreak):before {
-  color: #7f8075;
+  color: var(--tone-ink-7f8075);
   content: attr(data-placeholder);
   pointer-events: none;
   float: left;
@@ -112,19 +112,19 @@
   margin: 1.3em 0;
   padding: 0.2em 1.2em;
   border-left: 3px solid var(--editor-accent);
-  color: #c5b8a8;
+  color: var(--tone-ink-c5b8a8);
 }
 .rich-editor-document blockquote p:last-child {
   margin-bottom: 0;
 }
 .rich-editor-document a {
-  color: #d6aa78;
+  color: var(--tone-ink-d6aa78);
   text-decoration: underline;
   text-underline-offset: 3px;
   cursor: text;
 }
 .rich-editor-document pre {
-  background: #191b17;
+  background: var(--tone-surface-191b17);
   padding: 15px;
   border-radius: 6px;
   white-space: pre-wrap;
@@ -132,7 +132,7 @@
 .rich-editor-document hr {
   clear: both;
   border: 0;
-  border-top: 1px solid #514433;
+  border-top: 1px solid var(--tone-line-514433);
   margin: 2em 0;
 }
 .rich-editor-document .node-image {
@@ -180,17 +180,17 @@
   line-height: 1.7;
   text-align: center;
   margin-top: 8px;
-  color: #b9aa98;
+  color: var(--tone-ink-b9aa98);
 }
 .rich-image-selected {
   position: absolute;
   top: 8px;
   left: 8px;
   right: 8px;
-  background: #15120ce8;
+  background: var(--tone-surface-15120ce8);
   padding: 4px 7px;
   border-radius: 3px;
-  color: #eed5b0;
+  color: var(--tone-ink-eed5b0);
   font-size: 10px;
   line-height: 1.5;
 }
@@ -199,7 +199,7 @@
 .rich-album-picker {
   padding: 14px;
   border-bottom: 1px solid var(--editor-line);
-  background: #191a15;
+  background: var(--tone-surface-191a15);
 }
 .rich-image-layout,
 .rich-image-actions {
@@ -239,10 +239,10 @@
   width: 100%;
   margin: 0;
   padding: 9px 10px;
-  border: 1px solid #4b4132;
+  border: 1px solid var(--tone-line-4b4132);
   border-radius: 4px;
-  color: #e7e1d5;
-  background: #10120f;
+  color: var(--space-ink);
+  background: var(--tone-surface-10120f);
   font-size: 13px;
 }
 .rich-image-actions {
@@ -263,7 +263,7 @@
 }
 .rich-link-panel p {
   flex-basis: 100%;
-  color: #f2b799;
+  color: var(--tone-ink-f2b799);
   font-size: 12px;
   margin: 0;
 }
@@ -281,7 +281,7 @@
 }
 .rich-album-picker button {
   padding: 3px;
-  border: 1px solid #504232;
+  border: 1px solid var(--tone-line-504232);
   border-radius: 5px;
   width: 86px;
   height: 72px;
@@ -300,13 +300,13 @@
   gap: 6px 16px;
   padding: 11px 14px;
   border-top: 1px solid var(--editor-line);
-  color: #a79d8b;
+  color: var(--tone-ink-a79d8b);
   font-size: 11px;
 }
 .rich-upload-status {
-  background: #202015;
+  background: var(--tone-surface-202015);
   padding: 12px 15px;
-  border-bottom: 1px solid #5c5237;
+  border-bottom: 1px solid var(--tone-line-5c5237);
 }
 .rich-upload-job {
   display: flex;
@@ -323,20 +323,20 @@
   white-space: nowrap;
 }
 .rich-upload-job.has-error {
-  color: #f2b799;
+  color: var(--tone-ink-f2b799);
 }
 .rich-upload-job progress {
   width: 110px;
   height: 5px;
-  accent-color: #c99b6b;
+  accent-color: var(--tone-ink-c99b6b);
 }
 .rich-upload-status > p {
   margin: 6px 0 0;
   font-size: 11px;
-  color: #bdb19b;
+  color: var(--tone-ink-bdb19b);
 }
 .rich-editor-loading {
-  color: #afa497;
+  color: var(--tone-ink-afa497);
   font-size: 13px;
 }
 @media (max-width: 600px) {

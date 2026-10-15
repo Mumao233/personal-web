@@ -24,23 +24,23 @@
   outline: none;
 }
 .survey-question[aria-invalid="true"] > legend {
-  color: #e9ac99;
+  color: var(--tone-ink-e9ac99);
 }
 .survey-question .question-error {
-  color: #efb0a0;
+  color: var(--tone-ink-efb0a0);
   margin-top: 14px;
 }
 .survey-page .survey-progress > div,
 .survey-preview .survey-progress > div {
-  background: #c58a55;
+  background: var(--space-copper);
 }
 .survey-question .answer-option:has(input:checked) {
-  border-color: #9c7854;
-  background: #211b14;
+  border-color: var(--tone-line-9c7854);
+  background: var(--tone-surface-211b14);
 }
 .survey-question input[type="radio"],
 .survey-question input[type="checkbox"] {
-  accent-color: #c58a55;
+  accent-color: var(--tone-ink-c58a55);
 }
 .answer-label {
   flex: 1;
@@ -50,16 +50,16 @@
   gap: 7px 14px;
 }
 .answer-exclusive {
-  color: #c7a888;
+  color: var(--tone-ink-c7a888);
   font-size: 11px;
   font-weight: 400;
-  border: 1px solid #5a4631;
+  border: 1px solid var(--tone-line-5a4631);
   border-radius: 4px;
   padding: 1px 7px;
 }
 .survey-question > .survey-exclusive-hint {
   line-height: 1.8;
-  color: #b9a88f;
+  color: var(--tone-ink-b9a88f);
 }
 .survey-matrix {
   width: 100%;
@@ -74,12 +74,12 @@
 .matrix-table th,
 .matrix-table td {
   padding: 10px 6px;
-  border-bottom: 1px solid #393229;
+  border-bottom: 1px solid var(--tone-line-393229);
   text-align: center;
   overflow-wrap: anywhere;
 }
 .matrix-table thead th {
-  color: #c4b9a6;
+  color: var(--tone-ink-c4b9a6);
   font-weight: 400;
   font-size: 12px;
   line-height: 1.7;
@@ -93,11 +93,11 @@
   text-align: left;
   font-weight: 400;
   line-height: 1.8;
-  color: #e7e1d5;
+  color: var(--space-ink);
   padding-left: 0;
 }
 .matrix-table tbody tr:focus-within {
-  background: #161411;
+  background: var(--tone-surface-161411);
 }
 .matrix-choice {
   display: flex;
@@ -110,10 +110,10 @@
   border-radius: 5px;
 }
 .matrix-choice:has(input:checked) {
-  background: #34291d;
+  background: var(--tone-surface-34291d);
 }
 .matrix-choice:hover {
-  background: #211c16;
+  background: var(--tone-surface-211c16);
 }
 .matrix-mobile-label {
   display: none;
@@ -122,22 +122,22 @@
   padding: 7px 4px;
   font-size: 12px;
   min-height: 44px;
-  color: #bfa080;
+  color: var(--tone-ink-bfa080);
   white-space: nowrap;
 }
 .matrix-clear-cell {
   width: 52px;
 }
 .survey-end-notice {
-  border-left: 2px solid #bd915f;
+  border-left: 2px solid var(--tone-line-bd915f);
   padding: 17px 20px;
   margin: 30px 0;
-  background: #1b1712;
+  background: var(--tone-surface-1b1712);
   border-radius: 0 7px 7px 0;
 }
 .survey-end-notice strong {
   display: block;
-  color: #e4c5a2;
+  color: var(--tone-ink-e4c5a2);
   font-size: 15px;
   font-weight: 500;
   margin-bottom: 10px;
@@ -146,7 +146,7 @@
   font-size: 13px;
   line-height: 1.9;
   margin: 7px 0 0;
-  color: #c8bdaa;
+  color: var(--tone-ink-c8bdaa);
 }
 .survey-page .success,
 .survey-preview .success {
@@ -155,7 +155,7 @@
 .completion-counts {
   display: block;
   font-size: 12px;
-  color: #b09c83;
+  color: var(--tone-ink-b09c83);
   margin-top: 7px;
 }
 .survey-public-results {
@@ -174,7 +174,7 @@
   font-size: 14px;
 }
 .matrix-result-row h4 small {
-  color: #a69e92;
+  color: var(--space-muted);
   font-size: 11px;
 }
 .matrix-result-counts {
@@ -189,11 +189,11 @@
   font-size: 12px;
   padding: 7px 10px;
   margin: 0;
-  background: #181613;
+  background: var(--tone-surface-181613);
   border-radius: 4px;
 }
 .matrix-result-counts strong {
-  color: #d8b288;
+  color: var(--tone-ink-d8b288);
   font-weight: 500;
 }
 @container survey (max-width: 640px) {
@@ -212,7 +212,7 @@
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 8px;
-    border: 1px solid #393229;
+    border: 1px solid var(--tone-line-393229);
     border-radius: 8px;
     padding: 15px;
   }
@@ -231,7 +231,7 @@
   .matrix-choice {
     justify-content: flex-start;
     gap: 9px;
-    border: 1px solid #393229;
+    border: 1px solid var(--tone-line-393229);
     height: 100%;
     padding: 10px;
     text-align: left;
@@ -264,7 +264,7 @@
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 8px;
-    border: 1px solid #393229;
+    border: 1px solid var(--tone-line-393229);
     border-radius: 8px;
     padding: 15px;
   }
@@ -283,7 +283,7 @@
   .matrix-choice {
     justify-content: flex-start;
     gap: 9px;
-    border: 1px solid #393229;
+    border: 1px solid var(--tone-line-393229);
     height: 100%;
     padding: 10px;
     text-align: left;

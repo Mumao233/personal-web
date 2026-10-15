@@ -1,10 +1,10 @@
 .editor-recovery {
   margin: 1.25rem 0;
   padding: 1.25rem;
-  border: 1px solid #9e7958;
+  border: 1px solid var(--tone-line-9e7958);
   border-radius: 12px;
-  background: #151a20;
-  color: #e9e5dc;
+  background: var(--tone-surface-151a20);
+  color: var(--tone-ink-e9e5dc);
 }
 .editor-recovery[role="dialog"] {
   position: fixed;
@@ -14,7 +14,7 @@
   margin: auto;
 }
 .editor-recovery::backdrop {
-  background: #000a;
+  background: var(--tone-surface-000a);
 }
 .editor-recovery h3 {
   margin-top: 0;
