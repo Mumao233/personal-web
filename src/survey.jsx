@@ -8,7 +8,13 @@ import {
 } from "@phosphor-icons/react";
 import { api } from "./api";
 import { newSubmissionKey } from "./browser-state.js";
-import { unchangedAnswers, downloadAnswerCopy } from "./survey-recovery.js";
+import {
+  unchangedAnswers,
+  downloadAnswerCopy,
+  downloadLegacyRecovery,
+  boundedSurveyLoad,
+} from "./survey-recovery.js";
+import { createSurveyStorage } from "./survey-storage.js";
 import {
   surveyFlow,
   answerError,
@@ -303,10 +309,97 @@ function MatrixInput({ q, value, onChange }) {
     </div>
   );
 }
-export default function Survey({ id, preview, standalone = false, onSubmissionSuccess, onRestart }) {
+function RecoveryConfirmation({
+  title,
+  message,
+  confirmLabel,
+  onConfirm,
+  onCancel,
+  onDownload,
+  busy,
+}) {
+  const panel = useRef(null);
+  useEffect(() => {
+    const opener = document.activeElement;
+    panel.current?.querySelector("button")?.focus();
+    return () => {
+      if (opener?.isConnected) opener.focus();
+    };
+  }, []);
+  return (
+    <div
+      className="survey-confirm-layer"
+      onKeyDown={(event) => {
+        if (event.key === "Escape" && !busy) {
+          event.preventDefault();
+          onCancel();
+        }
+        if (event.key !== "Tab") return;
+        const nodes = [
+          ...panel.current.querySelectorAll("button:not(:disabled)"),
+        ];
+        if (!nodes.length) {
+          event.preventDefault();
+          return;
+        }
+        if (event.shiftKey && document.activeElement === nodes[0]) {
+          event.preventDefault();
+          nodes.at(-1).focus();
+        } else if (!event.shiftKey && document.activeElement === nodes.at(-1)) {
+          event.preventDefault();
+          nodes[0].focus();
+        }
+      }}
+    >
+      <section
+        ref={panel}
+        className="survey-confirm"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="survey-confirm-title"
+        aria-describedby="survey-confirm-message"
+      >
+        <h2 id="survey-confirm-title">{title}</h2>
+        <p id="survey-confirm-message">{message}</p>
+        <div className="survey-recovery-actions">
+          <button
+            type="button"
+            className="quiet"
+            disabled={busy}
+            onClick={onCancel}
+          >
+            取消
+          </button>
+          {onDownload && (
+            <button type="button" className="quiet" onClick={onDownload}>
+              下载当前答案
+            </button>
+          )}
+          <button
+            type="button"
+            className="button"
+            disabled={busy}
+            onClick={onConfirm}
+          >
+            {confirmLabel}
+          </button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+export default function Survey({
+  id,
+  preview,
+  standalone = false,
+  onSubmissionSuccess,
+  onRestart,
+}) {
   const [survey, setSurvey] = useState(preview || null);
   const [answers, setAnswers] = useState({});
   const answersRef = useRef({});
+  const surveyRef = useRef(preview || null);
   const [section, setSection] = useState(0);
   const [error, setError] = useState("");
   const [fieldErrors, setFieldErrors] = useState({});
@@ -314,58 +407,183 @@ export default function Survey({ id, preview, standalone = false, onSubmissionSu
   const [busy, setBusy] = useState(false);
   const [results, setResults] = useState(null);
   const [resultsError, setResultsError] = useState("");
-  const [draft, setDraft] = useState(false);
-  const [storageUnavailable, setStorageUnavailable] = useState(false);
+  const [storageState, setStorageState] = useState(null);
+  const [recoveries, setRecoveries] = useState([]);
+  const [showRecoveries, setShowRecoveries] = useState(false);
   const [versionConflict, setVersionConflict] = useState(false);
+  const [keyConflict, setKeyConflict] = useState(false);
   const [uncertain, setUncertain] = useState(false);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [previousCopy, setPreviousCopy] = useState(null);
+  const [confirmation, setConfirmation] = useState(null);
   const submissionKey = useRef(null);
   const attempt = useRef(null);
+  const pendingId = useRef(null);
+  const storage = useRef(null);
   const inflight = useRef(false);
   const lifecycle = useRef(null);
+  const definitionRequest = useRef(null);
+  const definitionGeneration = useRef(0);
+  const sectionHeading = useRef(null);
+  const sectionFocus = useRef(false);
+
+  useEffect(() => {
+    if (!sectionFocus.current) return;
+    sectionFocus.current = false;
+    sectionHeading.current?.focus({ preventScroll: true });
+    sectionHeading.current?.scrollIntoView?.({
+      behavior: "auto",
+      block: "start",
+    });
+  }, [section]);
+  const goToSection = (next) => {
+    sectionFocus.current = true;
+    setSection(next);
+  };
 
   const setCurrentAnswers = (next) => {
     answersRef.current = next;
     setAnswers(next);
   };
-  const storeDraft = (currentSurvey, next) => {
-    if (preview) return;
-    try {
-      localStorage.setItem(
-        "survey-" + id,
-        JSON.stringify({
-          revision: currentSurvey.updatedAt,
-          definitionVersion: currentSurvey.definitionVersion,
-          submissionKey: submissionKey.current,
-          pending: Boolean(attempt.current),
-          surveySnapshot: currentSurvey,
-          answers: next,
-        }),
-      );
-      setDraft(true);
-      setStorageUnavailable(false);
-    } catch {
-      setDraft(false);
-      setStorageUnavailable(true);
-    }
+  const setCurrentSurvey = (next) => {
+    surveyRef.current = next;
+    setSurvey(next);
   };
-  const removeDraft = () => {
-    if (preview) return;
+  const syncStorage = async (
+    controller = storage.current,
+    visit = lifecycle.current,
+  ) => {
+    if (!controller) return null;
+    const state = await controller.getState();
+    if (lifecycle.current === visit && storage.current === controller)
+      setStorageState(state);
+    return state;
+  };
+  const refreshRecoveries = async (
+    controller = storage.current,
+    visit = lifecycle.current,
+  ) => {
+    if (!controller) return;
+    const records = await controller.listRecoverable();
+    if (lifecycle.current === visit && storage.current === controller)
+      setRecoveries(records);
+  };
+  const storeDraft = async (currentSurvey, next, conflict = false) => {
+    if (preview || !storage.current) return;
+    const controller = storage.current,
+      visit = lifecycle.current;
+    await controller.saveDraft({
+      surveySnapshot: currentSurvey,
+      answers: next,
+      definitionVersion: currentSurvey.definitionVersion,
+      revision: currentSurvey.updatedAt,
+      submissionKey: submissionKey.current,
+      submissionConflict: conflict,
+    });
+    await syncStorage(controller, visit);
+  };
+  const downloadCurrent = () =>
+    downloadAnswerCopy(
+      surveyRef.current || { id, title: "问卷填写副本", questions: [] },
+      answersRef.current,
+      attempt.current,
+    );
+  const requestDefinition = () => {
+    definitionRequest.current?.abort();
+    const controller = new AbortController();
+    definitionRequest.current = controller;
+    return boundedSurveyLoad(
+      (signal) => api("/surveys/" + encodeURIComponent(id), { signal }),
+      { signal: controller.signal },
+    );
+  };
+
+  // Loading may be retried without clearing the in-memory answers or recovery.
+  const loadSurvey = async (state, visit = lifecycle.current) => {
+    if (lifecycle.current !== visit) return;
+    const generation = ++definitionGeneration.current;
+    definitionRequest.current?.abort();
+    setError("");
+    setLoadFailed(false);
+    if (state?.pending) {
+      const pending = state.pending;
+      pendingId.current = pending.id;
+      attempt.current = pending.body;
+      submissionKey.current = pending.body.submissionKey;
+      setCurrentSurvey(
+        pending.surveySnapshot || { id, title: "待确认的问卷", questions: [] },
+      );
+      setCurrentAnswers(pending.body.answers || {});
+      setUncertain(true);
+      setVersionConflict(false);
+      setKeyConflict(false);
+      return;
+    }
+    const stored = state?.draft;
+    const snapshot =
+      stored?.surveySnapshot?.id === id &&
+      Array.isArray(stored.surveySnapshot.questions)
+        ? stored.surveySnapshot
+        : null;
+    if (stored)
+      submissionKey.current = stored.submissionKey || submissionKey.current;
+    setKeyConflict(Boolean(stored?.submissionConflict));
     try {
-      localStorage.removeItem("survey-" + id);
-    } catch {
-      setStorageUnavailable(true);
+      const current = await requestDefinition();
+      if (
+        lifecycle.current !== visit ||
+        definitionGeneration.current !== generation
+      )
+        return;
+      if (!stored) {
+        setCurrentSurvey(current);
+        return;
+      }
+      if (
+        snapshot &&
+        (stored.definitionVersion === current.definitionVersion ||
+          (!stored.definitionVersion && stored.revision === current.updatedAt))
+      ) {
+        setCurrentSurvey(current);
+        setCurrentAnswers(pruneSurveyAnswers(current, stored.answers));
+        setVersionConflict(false);
+      } else {
+        setCurrentSurvey(
+          snapshot || {
+            id,
+            title: current.title,
+            questions: [],
+            definitionVersion: stored.definitionVersion,
+          },
+        );
+        setCurrentAnswers(stored.answers || {});
+        setVersionConflict(true);
+      }
+    } catch (e) {
+      if (
+        lifecycle.current !== visit ||
+        definitionGeneration.current !== generation
+      )
+        return;
+      setError(e.message);
+      setLoadFailed(true);
+      if (stored) {
+        setCurrentSurvey(
+          snapshot || {
+            id,
+            title: "已保存的问卷草稿",
+            questions: [],
+            definitionVersion: stored.definitionVersion,
+          },
+        );
+        setCurrentAnswers(stored.answers || {});
+      }
     }
   };
 
   useEffect(() => {
-    let active = true;
-    const currentVisit = {};
-    lifecycle.current = currentVisit;
-    const dispose = () => {
-      active = false;
-      if (lifecycle.current === currentVisit) lifecycle.current = null;
-    };
+    const visit = {};
+    lifecycle.current = visit;
     setCurrentAnswers({});
     setSection(0);
     setError("");
@@ -373,80 +591,136 @@ export default function Survey({ id, preview, standalone = false, onSubmissionSu
     setSuccess(null);
     setResults(null);
     setResultsError("");
-    setDraft(false);
-    setStorageUnavailable(false);
+    setStorageState(null);
+    setRecoveries([]);
+    setShowRecoveries(false);
     setVersionConflict(false);
+    setKeyConflict(false);
     setUncertain(false);
+    setLoadFailed(false);
     setBusy(false);
-    inflight.current = false;
+    setConfirmation(null);
     setPreviousCopy(null);
+    inflight.current = false;
     submissionKey.current = newSubmissionKey();
     attempt.current = null;
-    if (preview) {
-      setSurvey(preview);
-      return dispose;
-    }
-    setSurvey(null);
-    let stored = null;
-    try {
-      const candidate = JSON.parse(localStorage.getItem("survey-" + id) || "null");
-      if (candidate?.answers && typeof candidate.answers === "object" && !Array.isArray(candidate.answers)) stored = candidate;
-    } catch { setStorageUnavailable(true); }
-    const storedSnapshot = stored?.surveySnapshot?.id === id && Array.isArray(stored.surveySnapshot.questions)
-      ? stored.surveySnapshot : null;
-    // Receipt confirmation must work even when the public questionnaire has
-    // closed since the original request. Do not gate it on a fresh public GET.
-    if (stored?.pending && typeof stored.submissionKey === "string" && storedSnapshot) {
-      submissionKey.current = stored.submissionKey;
-      attempt.current = { answers: stored.answers, definitionVersion: stored.definitionVersion, submissionKey: stored.submissionKey };
-      setSurvey(storedSnapshot);
-      setCurrentAnswers(stored.answers);
-      setUncertain(true);
-      setDraft(true);
-      return dispose;
-    }
-    api("/surveys/" + encodeURIComponent(id))
-      .then((s) => {
-        if (!active) return;
-        setSurvey(s);
-        if (stored) {
-          if (
-            stored &&
-            (stored.definitionVersion === s.definitionVersion || (!stored.definitionVersion && stored.revision === s.updatedAt)) &&
-            stored.answers &&
-            typeof stored.answers === "object" &&
-            !Array.isArray(stored.answers)
-          ) {
-            submissionKey.current = stored.submissionKey || submissionKey.current;
-            const clean = pruneSurveyAnswers(s, stored.answers);
-            setCurrentAnswers(clean);
-            storeDraft(s, clean);
-          } else {
-            // Legacy drafts have no definition snapshot. Keep their answers
-            // downloadable, but never attach them to newly worded questions.
-            setSurvey(storedSnapshot || { id, title: s.title, questions: [], definitionVersion: stored.definitionVersion });
-            setCurrentAnswers(stored.answers);
-            setVersionConflict(true);
-            setDraft(true);
-          }
-        }
-      })
-      .catch((e) => {
-        if (active) {
-          setError(e.message);
-          if (stored) {
-            setSurvey(storedSnapshot || { id, title: "已保存的问卷草稿", questions: [], definitionVersion: stored.definitionVersion });
-            setCurrentAnswers(stored.answers);
-            setVersionConflict(true);
-            setDraft(true);
-          }
-        }
+    pendingId.current = null;
+    let controller;
+    storage.current = null;
+    if (preview) setCurrentSurvey(preview);
+    else {
+      setCurrentSurvey(null);
+      controller = createSurveyStorage({
+        surveyId: id,
+        onStatus: (state) => {
+          if (lifecycle.current === visit) setStorageState(state);
+        },
       });
-    return dispose;
+      storage.current = controller;
+      (async () => {
+        try {
+          const state = await controller.initialize();
+          if (lifecycle.current !== visit) return;
+          setStorageState(state);
+          await refreshRecoveries(controller, visit);
+          await loadSurvey(state, visit);
+        } catch (e) {
+          if (lifecycle.current === visit) {
+            setError(e.message);
+            setLoadFailed(true);
+          }
+        }
+      })();
+    }
+    const refresh = () => {
+      refreshRecoveries(controller, visit).catch(() => {});
+    };
+    window.addEventListener("storage", refresh);
+    window.addEventListener("focus", refresh);
+    return () => {
+      if (lifecycle.current === visit) lifecycle.current = null;
+      definitionGeneration.current++;
+      definitionRequest.current?.abort();
+      window.removeEventListener("storage", refresh);
+      window.removeEventListener("focus", refresh);
+      controller?.release();
+    };
   }, [id, preview]);
 
+  const runRecoveryAction = async (action) => {
+    if (inflight.current) return;
+    const visit = lifecycle.current;
+    inflight.current = true;
+    setBusy(true);
+    try {
+      await action(visit);
+    } catch (e) {
+      if (lifecycle.current === visit) {
+        setConfirmation(null);
+        setError(
+          e.code === "IN_USE"
+            ? "此记录正在其他标签页使用，请先关闭那个标签页，再恢复。"
+            : e.message,
+        );
+      }
+    } finally {
+      if (lifecycle.current === visit) {
+        inflight.current = false;
+        setBusy(false);
+      }
+    }
+  };
+  const retryLoad = () =>
+    runRecoveryAction(async (visit) => {
+      const state = await syncStorage();
+      await loadSurvey(state, visit);
+    });
+  const resetAnswers = async () => {
+    const visit = lifecycle.current,
+      controller = storage.current;
+    await controller?.clear();
+    if (lifecycle.current !== visit) return;
+    submissionKey.current = newSubmissionKey();
+    attempt.current = null;
+    pendingId.current = null;
+    setUncertain(false);
+    setKeyConflict(false);
+    setVersionConflict(false);
+    setPreviousCopy(null);
+    setCurrentAnswers({});
+    setSection(0);
+    setError("");
+    setFieldErrors({});
+    setSuccess(null);
+    setResults(null);
+    setResultsError("");
+    setConfirmation(null);
+    await syncStorage();
+    if (lifecycle.current === visit) onRestart?.();
+  };
+  const askClear = () => {
+    if (success || !Object.keys(answersRef.current).length)
+      runRecoveryAction(resetAnswers);
+    else
+      setConfirmation({
+        title: "确认清除当前答案",
+        message:
+          "这会清除本次尚未提交的答案和本机草稿。其他标签页的记录不受影响。你可以先下载当前答案。",
+        confirmLabel: "确认清除",
+        action: resetAnswers,
+        download: true,
+      });
+  };
   const change = (key, value) => {
-    if (busy || uncertain || versionConflict) return;
+    if (
+      busy ||
+      inflight.current ||
+      uncertain ||
+      versionConflict ||
+      keyConflict ||
+      loadFailed
+    )
+      return;
     const before = surveyFlow(survey, answersRef.current);
     const clean = pruneSurveyAnswers(survey, {
       ...answersRef.current,
@@ -461,25 +735,340 @@ export default function Survey({ id, preview, standalone = false, onSubmissionSu
       after.questions.map((q) => q.id).join("|")
     ) {
       const questionId = key.endsWith("__other") ? key.slice(0, -7) : key;
-      const nextGroups = surveySections(after.questions);
-      const editedGroup = nextGroups.findIndex((group) =>
+      const next = surveySections(after.questions).findIndex((group) =>
         group.questions.some((q) => q.id === questionId),
       );
-      setSection(editedGroup >= 0 ? editedGroup : 0);
+      setSection(next >= 0 ? next : 0);
     }
-    storeDraft(survey, clean);
+    const visit = lifecycle.current;
+    storeDraft(survey, clean).catch((e) => {
+      if (lifecycle.current === visit) setError(e.message);
+    });
+  };
+  const restoreRecord = (entry) => {
+    const action = async (visit) => {
+      const controller = storage.current;
+      const state = await controller.restore(entry.id);
+      if (lifecycle.current !== visit) return;
+      setStorageState(state);
+      setCurrentAnswers({});
+      setSection(0);
+      setFieldErrors({});
+      setVersionConflict(false);
+      setKeyConflict(false);
+      setLoadFailed(false);
+      setUncertain(false);
+      attempt.current = null;
+      pendingId.current = null;
+      setPreviousCopy(null);
+      setConfirmation(null);
+      await refreshRecoveries(controller, visit);
+      await loadSurvey(state, visit);
+    };
+    if (Object.keys(answersRef.current).length)
+      setConfirmation({
+        title: "恢复另一条填写记录",
+        message:
+          storageState?.mode === "memory"
+            ? "恢复后将替换当前页答案。当前答案只在内存中，请先下载需要保留的内容。"
+            : "恢复后将显示所选记录。当前已保存的草稿会保留，可从恢复列表再次选择。",
+        confirmLabel: "确认恢复",
+        action,
+        download: true,
+      });
+    else runRecoveryAction(action);
+  };
+  const downloadRecord = (entry) => {
+    if (entry.kind === "legacy" || entry.downloadOnly) {
+      downloadLegacyRecovery(entry.record);
+      return;
+    }
+    const record = entry.record.original || entry.record;
+    const body =
+      record.body ||
+      (record.pending
+        ? {
+            answers: record.answers,
+            definitionVersion: record.definitionVersion,
+            submissionKey: record.submissionKey,
+          }
+        : null);
+    downloadAnswerCopy(
+      record.surveySnapshot || {
+        title: "以前的问卷草稿",
+        questions: [],
+        definitionVersion: record.definitionVersion,
+      },
+      body?.answers || record.answers || {},
+      body,
+    );
+  };
+  const askDelete = (entry) =>
+    setConfirmation({
+      title:
+        entry.kind === "pending" ? "删除待确认的恢复记录" : "删除本机填写记录",
+      message:
+        entry.kind === "pending"
+          ? "这只删除本机恢复副本，不会撤销服务器上可能已经保存的答卷。重新填写可能产生另一份答卷和统计记录。请先下载需要保留的答案。"
+          : "这会删除所选的本机草稿，无法撤销。其他填写记录不受影响。",
+      confirmLabel: "确认删除",
+      download: entry.id === pendingId.current,
+      action: async (visit) => {
+        const controller = storage.current;
+        await controller.deleteRecovery(entry.id);
+        if (lifecycle.current !== visit) return;
+        if (entry.id === pendingId.current) {
+          await resetAnswers();
+          if (lifecycle.current !== visit) return;
+          await loadSurvey(await syncStorage(controller, visit), visit);
+        }
+        if (lifecycle.current !== visit) return;
+        setConfirmation(null);
+        await syncStorage();
+        await refreshRecoveries();
+      },
+    });
+  const setSaving = (enabled) => {
+    const action = async (visit) => {
+      const controller = storage.current;
+      await controller.setMode(enabled ? "device" : "memory");
+      await syncStorage(controller, visit);
+      if (lifecycle.current === visit) setConfirmation(null);
+    };
+    if (enabled) runRecoveryAction(action);
+    else
+      setConfirmation({
+        title: "停止设备保存",
+        message:
+          "将删除本次填写在设备上的草稿及待确认副本，其他记录会保留。当前答案只在本页内存中，刷新或关闭后无法恢复。待确认答卷可能已经在服务器保存；关闭本机保存不会撤销提交。建议先下载当前答案。",
+        confirmLabel: "停止保存并删除本次本机记录",
+        action,
+        download: true,
+      });
+  };
+  const reloadSurvey = () =>
+    runRecoveryAction(async () => {
+      const visit = lifecycle.current;
+      const generation = ++definitionGeneration.current;
+      const current = await requestDefinition();
+      if (
+        lifecycle.current !== visit ||
+        definitionGeneration.current !== generation
+      )
+        return;
+      const previous = { survey, answers: structuredClone(answersRef.current) };
+      const clean = pruneSurveyAnswers(
+        current,
+        unchangedAnswers(survey, current, answersRef.current),
+      );
+      setPreviousCopy(previous);
+      if (!keyConflict) submissionKey.current = newSubmissionKey();
+      attempt.current = null;
+      pendingId.current = null;
+      setCurrentSurvey(current);
+      setCurrentAnswers(clean);
+      setSection(0);
+      setFieldErrors({});
+      setError("");
+      setVersionConflict(false);
+      setUncertain(false);
+      setLoadFailed(false);
+      await storeDraft(current, clean, keyConflict);
+    });
+  const beginAfterConflict = () =>
+    setConfirmation({
+      title: "开始新一次填写",
+      message:
+        "将保留当前答案并生成新的提交标识，不会自动提交。此前的标识可能已对应另一份答卷，再次提交会新增答卷并计入统计。请确认后再继续。",
+      confirmLabel: "确认开始新一次填写",
+      download: true,
+      action: async () => {
+        submissionKey.current = newSubmissionKey();
+        attempt.current = null;
+        pendingId.current = null;
+        setKeyConflict(false);
+        setError("");
+        setConfirmation(null);
+        await storeDraft(survey, answersRef.current);
+      },
+    });
+  const loadResults = async () => {
+    setResultsError("");
+    const visit = lifecycle.current;
+    try {
+      const result = await api(
+        "/surveys/" + encodeURIComponent(id) + "/results",
+      );
+      if (lifecycle.current === visit) setResults(result);
+    } catch {
+      if (lifecycle.current === visit)
+        setResultsError("回答已保存，统计暂时无法加载。");
+    }
   };
 
+  const automaticRecovery = !(storageState?.limitations || []).some((item) =>
+    ["LOCKS_UNAVAILABLE", "SESSION_UNAVAILABLE"].includes(item.code),
+  );
+  const recoveryControls = !preview && !success && (
+    <section className="survey-recovery-controls" aria-label="填写进度与恢复">
+      <label className="survey-save-choice">
+        <input
+          type="checkbox"
+          checked={storageState?.mode !== "memory"}
+          disabled={busy || !storageState}
+          onChange={(event) => setSaving(event.target.checked)}
+        />
+        在此设备保存填写进度
+      </label>
+      <p className="fine">
+        {storageState?.mode === "memory"
+          ? "本次答案仅保留在当前页内存；刷新或关闭后无法恢复。"
+          : `${automaticRecovery ? "本标签页刷新后自动恢复；其他标签页的记录需主动选择。" : "当前浏览器无法保证刷新后自动恢复，请从本机恢复列表选择自己的记录。"}普通草稿保留到最后修改后 7 天，待确认提交保留到确认或主动删除。`}
+      </p>
+      {(storageState?.limitations || []).map((limitation, index) => (
+        <p key={index} className="draft-note" role="status">
+          {typeof limitation === "string" ? limitation : limitation.message}
+        </p>
+      ))}
+      <div className="survey-recovery-actions">
+        <button
+          type="button"
+          className="quiet"
+          disabled={busy}
+          aria-expanded={showRecoveries}
+          onClick={() => {
+            setShowRecoveries(!showRecoveries);
+            refreshRecoveries().catch((e) => setError(e.message));
+          }}
+        >
+          恢复本机填写记录{recoveries.length ? `（${recoveries.length}）` : ""}
+        </button>
+        {Object.keys(answers).length > 0 && (
+          <button type="button" className="quiet" onClick={downloadCurrent}>
+            下载当前答案
+          </button>
+        )}
+        {!uncertain &&
+          !keyConflict &&
+          !versionConflict &&
+          Object.keys(answers).length > 0 && (
+            <button
+              type="button"
+              className="quiet"
+              disabled={busy}
+              onClick={askClear}
+            >
+              清除当前答案
+            </button>
+          )}
+        {uncertain && (
+          <button
+            type="button"
+            className="quiet"
+            disabled={busy}
+            onClick={() =>
+              askDelete({ id: pendingId.current, kind: "pending" })
+            }
+          >
+            删除本次恢复记录
+          </button>
+        )}
+      </div>
+      {showRecoveries && (
+        <div className="survey-recovery-list" aria-label="可恢复的填写记录">
+          {!recoveries.length && <p className="fine">没有其他可恢复的记录。</p>}
+          {recoveries.map((entry) => (
+            <article key={entry.id} data-recovery-id={entry.id}>
+              <p>
+                <strong>
+                  {entry.kind === "pending"
+                    ? "提交结果待确认"
+                    : entry.kind === "legacy"
+                      ? "旧版填写记录"
+                      : "未提交草稿"}
+                </strong>
+                <br />
+                {entry.updatedAt &&
+                Number.isFinite(new Date(entry.updatedAt).getTime()) ? (
+                  <time dateTime={new Date(entry.updatedAt).toISOString()}>
+                    {new Date(entry.updatedAt).toLocaleString("zh-CN")}
+                  </time>
+                ) : (
+                  "保存时间未知"
+                )}
+              </p>
+              {entry.notice && <p className="fine">{entry.notice}</p>}
+              {entry.downloadOnly && (
+                <p className="fine">
+                  缺少原题目定义，仅可下载核对，不会套用到当前问卷。
+                </p>
+              )}
+              <div className="survey-recovery-actions">
+                {!entry.downloadOnly && (
+                  <button
+                    type="button"
+                    className="quiet"
+                    disabled={busy || uncertain}
+                    onClick={() => restoreRecord(entry)}
+                  >
+                    恢复此记录
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="quiet"
+                  onClick={() => downloadRecord(entry)}
+                >
+                  下载此记录
+                </button>
+                <button
+                  type="button"
+                  className="quiet"
+                  disabled={busy}
+                  onClick={() => askDelete(entry)}
+                >
+                  删除此记录
+                </button>
+              </div>
+            </article>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+  const confirmDialog = confirmation && (
+    <RecoveryConfirmation
+      {...confirmation}
+      busy={busy}
+      onCancel={() => setConfirmation(null)}
+      onDownload={confirmation.download ? downloadCurrent : undefined}
+      onConfirm={() => runRecoveryAction(confirmation.action)}
+    />
+  );
   if (!survey)
     return (
       <div className="page survey-state">
-        {!standalone && <a className="back" href="/?page=you">
-          <ArrowLeft /> 返回问卷
-        </a>}
+        {!standalone && (
+          <a className="back" href="/?page=you">
+            <ArrowLeft /> 返回问卷
+          </a>
+        )}
         <section role={error ? "alert" : "status"}>
           {error && <h1>问卷暂时无法填写</h1>}
           <p>{error || "正在打开问卷…"}</p>
         </section>
+        {loadFailed && (
+          <button
+            type="button"
+            className="button"
+            disabled={busy}
+            onClick={retryLoad}
+          >
+            重新加载问卷
+          </button>
+        )}
+        {recoveryControls}
+        {confirmDialog}
       </div>
     );
 
@@ -489,6 +1078,8 @@ export default function Survey({ id, preview, standalone = false, onSubmissionSu
   const current = Math.min(section, Math.max(0, sections.length - 1));
   const active = sections[current]?.questions || [];
   const lastSection = current >= sections.length - 1;
+  const locked =
+    busy || uncertain || versionConflict || keyConflict || loadFailed;
   const check = (items) => {
     const errors = {};
     for (const q of items) {
@@ -499,72 +1090,22 @@ export default function Survey({ id, preview, standalone = false, onSubmissionSu
     const first = items.find((q) => errors[q.id]);
     if (!first) return true;
     setError(errors[first.id]);
-    const errorSection = sections.findIndex((group) =>
+    const next = sections.findIndex((group) =>
       group.questions.some((q) => q.id === first.id),
     );
-    if (errorSection >= 0) setSection(errorSection);
+    if (next >= 0) setSection(next);
     requestAnimationFrame(() =>
       document.getElementById(`question-${first.id}`)?.focus(),
     );
     return false;
   };
-  const clearAnswers = () => {
-    submissionKey.current = newSubmissionKey();
-    attempt.current = null;
-    setUncertain(false);
-    setVersionConflict(false);
-    setPreviousCopy(null);
-    removeDraft();
-    setCurrentAnswers({});
-    setSection(0);
-    setDraft(false);
-    setError("");
-    setFieldErrors({});
-    setSuccess(null);
-    setResults(null);
-    setResultsError("");
-    onRestart?.();
-  };
-  const reloadSurvey = async () => {
-    if (inflight.current) return;
-    inflight.current = true;
-    setBusy(true);
-    const currentVisit = lifecycle.current;
-    try {
-      const current = await api("/surveys/" + encodeURIComponent(id));
-      if (lifecycle.current !== currentVisit) return;
-      const previous = { survey, answers: structuredClone(answersRef.current) };
-      const clean = pruneSurveyAnswers(current, unchangedAnswers(survey, current, answersRef.current));
-      setPreviousCopy(previous);
-      submissionKey.current = newSubmissionKey();
-      attempt.current = null;
-      setSurvey(current);
-      setCurrentAnswers(clean);
-      setSection(0);
-      setFieldErrors({});
-      setError("");
-      setVersionConflict(false);
-      setUncertain(false);
-      storeDraft(current, clean);
-    } catch (e) { if (lifecycle.current === currentVisit) setError(e.message); }
-    finally { if (lifecycle.current === currentVisit) { inflight.current = false; setBusy(false); } }
-  };
-  const loadResults = async () => {
-    setResultsError("");
-    const currentVisit = lifecycle.current;
-    try {
-      const result = await api("/surveys/" + encodeURIComponent(id) + "/results");
-      if (lifecycle.current === currentVisit) setResults(result);
-    } catch {
-      if (lifecycle.current === currentVisit) setResultsError("回答已保存，统计暂时无法加载。");
-    }
-  };
-  async function submit(e) {
-    e.preventDefault();
-    if (inflight.current || versionConflict) return;
+  async function submit(event) {
+    event.preventDefault();
+    if (inflight.current || versionConflict || keyConflict || loadFailed)
+      return;
     setError("");
     if (!attempt.current && !lastSection) {
-      if (check(active)) setSection(current + 1);
+      if (check(active)) goToSection(current + 1);
       return;
     }
     if (!attempt.current && !check(questions)) return;
@@ -580,41 +1121,90 @@ export default function Survey({ id, preview, standalone = false, onSubmissionSu
     }
     setBusy(true);
     inflight.current = true;
-    const currentVisit = lifecycle.current;
+    const visit = lifecycle.current,
+      controller = storage.current;
     try {
-      const clean = pruneSurveyAnswers(survey, answersRef.current);
-      attempt.current ||= { answers: clean, definitionVersion: survey.definitionVersion, submissionKey: submissionKey.current || newSubmissionKey() };
-      storeDraft(survey, attempt.current.answers);
-      const result = await api("/surveys/" + encodeURIComponent(id) + "/submit", {
-        method: "POST",
-        body: attempt.current,
-      });
-      if (lifecycle.current !== currentVisit) return;
-      if (!result || !["completed", "terminated"].includes(result.completion)) {
-        throw Object.assign(new Error("服务器未返回有效的提交确认，请重试确认本次提交。"), { code: "INVALID_RESPONSE" });
+      if (!attempt.current) {
+        const pending = await controller.freezePending({
+          body: {
+            answers: pruneSurveyAnswers(survey, answersRef.current),
+            definitionVersion: survey.definitionVersion,
+            submissionKey: submissionKey.current || newSubmissionKey(),
+          },
+          surveySnapshot: survey,
+        });
+        if (lifecycle.current !== visit) return;
+        attempt.current = pending.body;
+        pendingId.current = pending.id;
+        await syncStorage(controller, visit);
       }
+      const result = await api(
+        "/surveys/" + encodeURIComponent(id) + "/submit",
+        { method: "POST", body: attempt.current },
+      );
+      if (lifecycle.current !== visit) return;
+      if (!result || !["completed", "terminated"].includes(result.completion))
+        throw Object.assign(
+          new Error("服务器未返回有效的提交确认，请重试确认本次提交。"),
+          { code: "INVALID_RESPONSE" },
+        );
+      await controller.confirmPending(pendingId.current);
+      if (lifecycle.current !== visit) return;
+      attempt.current = null;
+      pendingId.current = null;
       setUncertain(false);
       setSuccess({
         message: result.message || "回答已保存。",
         completion: result.completion,
         termination: result.termination,
       });
-      removeDraft();
-      setDraft(false);
+      await syncStorage(controller, visit);
+      await refreshRecoveries(controller, visit);
+      if (lifecycle.current !== visit) return;
       onSubmissionSuccess?.(id, result);
       if (survey.publicResults) await loadResults();
     } catch (e) {
-      if (lifecycle.current !== currentVisit) return;
+      if (lifecycle.current !== visit) return;
       setError(e.message);
-      const unknown = e.code === "INVALID_RESPONSE" || !e.status || e.status >= 500 || e.status === 429 || e.status === 408;
-      setUncertain(unknown);
+      const unknown =
+        e.code === "INVALID_RESPONSE" ||
+        !e.status ||
+        e.status >= 500 ||
+        e.status === 429 ||
+        e.status === 408;
+      setUncertain(unknown && Boolean(attempt.current));
       if (!unknown) {
+        try {
+          await controller.deleteRecovery(pendingId.current);
+        } catch (cleanupError) {
+          if (lifecycle.current !== visit) return;
+          setUncertain(Boolean(attempt.current));
+          setError(
+            `${e.message}；本机提交恢复记录未能清理，原请求继续保持锁定。${cleanupError.message}`,
+          );
+          return;
+        }
+        if (lifecycle.current !== visit) return;
         attempt.current = null;
-        storeDraft(survey, answersRef.current);
+        pendingId.current = null;
+        try {
+          await storeDraft(
+            survey,
+            answersRef.current,
+            e.code === "SUBMISSION_KEY_CONFLICT",
+          );
+        } catch (storageError) {
+          if (lifecycle.current !== visit) return;
+          setError(
+            `${e.message}；本机草稿暂时无法更新，当前答案仍保留在本页。${storageError.message}`,
+          );
+        }
+        if (lifecycle.current !== visit) return;
       }
       if (e.code === "SURVEY_VERSION_CONFLICT") setVersionConflict(true);
+      if (e.code === "SUBMISSION_KEY_CONFLICT") setKeyConflict(true);
     } finally {
-      if (lifecycle.current === currentVisit) {
+      if (lifecycle.current === visit) {
         inflight.current = false;
         setBusy(false);
       }
@@ -629,7 +1219,11 @@ export default function Survey({ id, preview, standalone = false, onSubmissionSu
         </a>
       )}
       <span className="eyebrow">
-        {preview ? "PREVIEW / 预览" : standalone ? "QUESTIONNAIRE / 问卷" : "ABOUT YOU / 关于你"}
+        {preview
+          ? "PREVIEW / 预览"
+          : standalone
+            ? "QUESTIONNAIRE / 问卷"
+            : "ABOUT YOU / 关于你"}
       </span>
       <h1>{survey.title}</h1>
       <p className="survey-description">{survey.description}</p>
@@ -637,6 +1231,19 @@ export default function Survey({ id, preview, standalone = false, onSubmissionSu
         <div className="success" role="status">
           <Check size={36} />
           <h2>{success.message}</h2>
+          {(storageState?.limitations || [])
+            .filter((item) =>
+              [
+                "DELETE_FAILED",
+                "LEGACY_SOURCE_REMAINS",
+                "OTHER_COPIES_REMAIN",
+              ].includes(item.code),
+            )
+            .map((item) => (
+              <p className="draft-note" key={item.code}>
+                {item.message}
+              </p>
+            ))}
           {success.completion === "terminated" && (
             <p className="fine">
               本次问卷已提前结束{preview ? "。" : "，已填写的回答已保存。"}
@@ -651,62 +1258,122 @@ export default function Survey({ id, preview, standalone = false, onSubmissionSu
               </button>
             </p>
           )}
-          <button className="quiet" disabled={busy} onClick={clearAnswers}>
+          <button className="quiet" disabled={busy} onClick={askClear}>
             重新填写
           </button>
         </div>
       ) : (
-        <form onSubmit={submit} noValidate>
+        <form
+          onSubmit={submit}
+          noValidate
+          inert={confirmation ? true : undefined}
+        >
+          {recoveryControls}
           {versionConflict && (
             <section className="module-recovery" role="alert">
-              <p>问卷已经更新，当前答案仍保留。加载新版后，只有题目定义未变化的答案会保留，其他题目请重新确认。</p>
-              <button type="button" className="quiet" onClick={() => downloadAnswerCopy(survey, answersRef.current)}>下载当前填写副本</button>{" "}
-              <button type="button" className="quiet" disabled={busy} onClick={reloadSurvey}>加载最新问卷</button>
+              <p>
+                问卷已经更新，当前答案仍保留。加载新版后，只有题目定义未变化的答案会保留，其他题目请重新确认。
+              </p>
+              <button type="button" className="quiet" onClick={downloadCurrent}>
+                下载当前填写副本
+              </button>{" "}
+              <button
+                type="button"
+                className="quiet"
+                disabled={busy}
+                onClick={reloadSurvey}
+              >
+                加载最新问卷
+              </button>
             </section>
           )}
-          {previousCopy && <p className="draft-note">已加载最新问卷，请确认变更的题目。 <button type="button" onClick={() => downloadAnswerCopy(previousCopy.survey, previousCopy.answers)}>下载更新前的填写副本</button></p>}
-          {uncertain && <p className="draft-note" role="status">上一次提交结果尚未确认。重试会确认同一次提交，不会重复保存。</p>}
-          {draft && (
+          {keyConflict && (
+            <section className="module-recovery" role="alert">
+              <p>
+                此提交标识已用于其他内容。当前答案已保留；开始新一次填写后再次提交可能新增一份统计记录，不会自动提交。
+              </p>
+              <button
+                type="button"
+                className="quiet"
+                disabled={busy}
+                onClick={beginAfterConflict}
+              >
+                保留当前答案，开始新一次填写
+              </button>
+            </section>
+          )}
+          {loadFailed && (
+            <section className="module-recovery" role="alert">
+              <p>
+                暂时无法取得问卷。当前答案与恢复记录仍保留，请重试或下载副本。
+              </p>
+              <button type="button" className="quiet" onClick={downloadCurrent}>
+                下载当前填写副本
+              </button>{" "}
+              <button
+                type="button"
+                className="quiet"
+                disabled={busy}
+                onClick={retryLoad}
+              >
+                重新加载问卷
+              </button>
+            </section>
+          )}
+          {previousCopy && (
             <p className="draft-note">
-              已保存本机草稿 · 刷新后可继续{" "}
-              <button type="button" disabled={busy || uncertain || versionConflict} onClick={clearAnswers}>
-                清除
+              已加载最新问卷，请确认变更的题目。{" "}
+              <button
+                type="button"
+                onClick={() =>
+                  downloadAnswerCopy(previousCopy.survey, previousCopy.answers)
+                }
+              >
+                下载更新前的填写副本
               </button>
             </p>
           )}
-          {storageUnavailable && (
+          {uncertain && (
             <p className="draft-note" role="status">
-              当前浏览器无法保存本机草稿，回答仍可正常提交；请先不要关闭本页。
+              上一次提交结果尚未确认。重试会确认同一次提交，不会重复保存。确认前不能修改答案；可以下载答案或明确删除本机恢复记录。
             </p>
           )}
-          {progress.total > 0 && <div
-            className="survey-progress"
-            role="progressbar"
-            aria-label="必答项填写进度"
-            aria-valuemin={0}
-            aria-valuemax={progress.total}
-            aria-valuenow={progress.answered}
-            aria-valuetext={`已填写 ${progress.answered} / ${progress.total} 项必答项，${progress.percent}%，尚未提交`}
-          >
+          {storageState?.draft && !uncertain && (
+            <p className="draft-note">
+              {storageState.mode === "device"
+                ? `已保存本次本机草稿 · ${automaticRecovery ? "本标签页刷新后可继续" : "刷新后请主动选择恢复记录"}`
+                : "当前答案仅在本页内存中"}
+            </p>
+          )}
+          {progress.total > 0 && (
             <div
-              style={{
-                width:
-                  progress.percent + "%",
-              }}
-            />
-          </div>}
+              className="survey-progress"
+              role="progressbar"
+              aria-label="必答项填写进度"
+              aria-valuemin={0}
+              aria-valuemax={progress.total}
+              aria-valuenow={progress.answered}
+              aria-valuetext={`已填写 ${progress.answered} / ${progress.total} 项必答项，${progress.percent}%，尚未提交`}
+            >
+              <div style={{ width: progress.percent + "%" }} />
+            </div>
+          )}
           <p className="fine survey-progress-caption" role="status">
-            {termination ? "已触发结束条件，待提交" : progress.total
-              ? `已填写 ${progress.answered} / ${progress.total} 项必答项 · ${progress.percent}%${progress.answered === progress.total ? " · 待提交" : ""}`
-              : "全部为选填，可直接提交"}
+            {termination
+              ? "已触发结束条件，待提交"
+              : progress.total
+                ? `已填写 ${progress.answered} / ${progress.total} 项必答项 · ${progress.percent}%${progress.answered === progress.total ? " · 待提交" : ""}`
+                : "全部为选填，可直接提交"}
           </p>
           <div className="section-head">
-            <h2>{sections[current]?.title || "问题"}</h2>
+            <h2 ref={sectionHeading} tabIndex={-1}>
+              {sections[current]?.title || "问题"}
+            </h2>
             <span className="mono">
               第 {current + 1} / {Math.max(1, sections.length)} 部分
             </span>
           </div>
-          <fieldset className="survey-active-section" disabled={busy || uncertain || versionConflict}>
+          <fieldset className="survey-active-section" disabled={locked}>
             <legend className="survey-sr-only">
               {sections[current]?.title || "当前部分"}
             </legend>
@@ -745,30 +1412,34 @@ export default function Survey({ id, preview, standalone = false, onSubmissionSu
               <button
                 type="button"
                 className="quiet"
-                disabled={busy || uncertain || versionConflict}
+                disabled={locked}
                 onClick={() => {
-                  setSection(current - 1);
+                  goToSection(current - 1);
                   setError("");
                 }}
               >
                 <ArrowLeft /> 上一部分
               </button>
             )}
-            <button className="button" disabled={busy || versionConflict}>
+            <button
+              className="button"
+              disabled={busy || versionConflict || keyConflict || loadFailed}
+            >
               {busy
                 ? "正在保存…"
                 : uncertain
                   ? "重试确认提交结果"
-                : !lastSection
-                  ? "下一部分"
-                  : termination
-                    ? "结束并提交"
-                    : "提交回答"}
+                  : !lastSection
+                    ? "下一部分"
+                    : termination
+                      ? "结束并提交"
+                      : "提交回答"}
               <ArrowRight />
             </button>
           </div>
         </form>
       )}
+      {confirmDialog}
     </div>
   );
 }

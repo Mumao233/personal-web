@@ -107,20 +107,18 @@
     mask-image: linear-gradient(
       90deg,
       transparent 0,
-      rgba(0, 0, 0, 0.08) 8px,
-      rgba(0, 0, 0, 0.32) 20px,
-      rgba(0, 0, 0, 0.72) 36px,
-      rgba(0, 0, 0, 0.94) 56px,
-      #000 80px
+      rgba(0, 0, 0, 0.15) 6px,
+      rgba(0, 0, 0, 0.55) 16px,
+      rgba(0, 0, 0, 0.9) 24px,
+      #000 32px
     );
     -webkit-mask-image: linear-gradient(
       90deg,
       transparent 0,
-      rgba(0, 0, 0, 0.08) 8px,
-      rgba(0, 0, 0, 0.32) 20px,
-      rgba(0, 0, 0, 0.72) 36px,
-      rgba(0, 0, 0, 0.94) 56px,
-      #000 80px
+      rgba(0, 0, 0, 0.15) 6px,
+      rgba(0, 0, 0, 0.55) 16px,
+      rgba(0, 0, 0, 0.9) 24px,
+      #000 32px
     );
   }
   .mobile-navigation {

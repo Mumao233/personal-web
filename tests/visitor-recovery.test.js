@@ -5,6 +5,7 @@ import { JSDOM } from "jsdom";
 import { createServer } from "vite";
 import { safeStorage } from "../src/browser-state.js";
 import { unchangedAnswers } from "../src/survey-recovery.js";
+import { fakeSurveyLocks, surveyRecords } from "./survey-test-helpers.js";
 
 let dom, vite, createRoot, root, container, Questions, Survey, Intro, Boundary;
 const descriptors = new Map();
@@ -45,6 +46,10 @@ before(async () => {
     removeEventListener() {},
   });
   globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+  Object.defineProperty(navigator, "locks", {
+    configurable: true,
+    value: fakeSurveyLocks(),
+  });
   ({ createRoot } = await import("react-dom/client"));
   vite = await createServer({
     configFile: false,
@@ -63,6 +68,7 @@ afterEach(async () => {
   root = null;
   globalThis.fetch = originalFetch;
   dom.window.localStorage.clear();
+  dom.window.sessionStorage.clear();
 });
 after(async () => {
   await vite?.close();
@@ -239,7 +245,7 @@ test("survey response-loss retry survives remount and keeps its version/key/snap
   await mount(React.createElement(Survey, { id: "review" }));
   await click(container.querySelector("input[type=radio]"));
   await submit();
-  assert.equal(JSON.parse(localStorage.getItem("survey-review")).pending, true);
+  assert.equal(surveyRecords(localStorage, "review", "pending").length, 1);
   await act(() => root.unmount());
   root = null;
   await mount(React.createElement(Survey, { id: "review" }));
@@ -249,7 +255,7 @@ test("survey response-loss retry survives remount and keeps its version/key/snap
   assert.equal(bodies[0].definitionVersion, "old-definition");
   assert.ok(bodies[0].submissionKey);
   assert.match(container.textContent, /已确认原答卷/);
-  assert.equal(localStorage.getItem("survey-review"), null);
+  assert.equal(surveyRecords(localStorage, "review", "pending").length, 0);
 });
 
 test("survey version conflict offers recovery and only retains unchanged definitions", async () => {
@@ -325,8 +331,8 @@ for (const conflictBeforeRefresh of [false, true]) {
       "Draft text preserved across refresh",
     );
     if (conflictBeforeRefresh) await submit();
-    const stored = JSON.parse(localStorage.getItem("survey-review"));
-    assert.equal(stored.pending, false);
+    const stored = surveyRecords(localStorage, "review", "draft")[0];
+    assert.equal(surveyRecords(localStorage, "review", "pending").length, 0);
     assert.deepEqual(stored.surveySnapshot, old);
     latest = true;
     await remountSurvey();
@@ -362,16 +368,20 @@ test("legacy drafts without definitions remain downloadable and are never attach
   );
   globalThis.fetch = async () => reply(survey());
   await mount(React.createElement(Survey, { id: "review" }));
-  assert.ok(named("下载当前填写副本"));
-  assert.equal(container.querySelector('input[type="radio"]'), null);
-  const copy = await downloadedCopy(named("下载当前填写副本"));
-  assert.deepEqual(copy.answers, answers);
-  assert.deepEqual(copy.questions, []);
-  await click(named("加载最新问卷"));
   assert.equal(container.querySelector('input[type="radio"]').checked, false);
   assert.equal(container.querySelector("textarea").value, "");
-  const previous = await downloadedCopy(named("下载更新前的填写副本"));
-  assert.deepEqual(previous.answers, answers);
+  await click(named("恢复本机填写记录"));
+  assert.equal(
+    named("恢复此记录"),
+    undefined,
+    "unknown definitions can only be downloaded",
+  );
+  const copy = await downloadedCopy(named("下载此记录"));
+  assert.deepEqual(copy.answers, answers);
+  assert.deepEqual(copy.questions, []);
+  assert.equal(container.querySelector('input[type="radio"]').checked, false);
+  assert.equal(container.querySelector("textarea").value, "");
+  assert.equal(surveyRecords(localStorage, "review", "legacy").length, 1);
 });
 
 test("pending submission remount can confirm its receipt even when the current survey GET would return 403", async () => {
@@ -405,7 +415,7 @@ test("pending submission remount can confirm its receipt even when the current s
   await submit();
   assert.deepEqual(bodies[1], bodies[0]);
   assert.match(container.textContent, /Receipt confirmed after closure/);
-  assert.equal(localStorage.getItem("survey-review"), null);
+  assert.equal(surveyRecords(localStorage, "review", "pending").length, 0);
 });
 
 test("a normal saved draft remains exportable when the refreshed survey is closed", async () => {
@@ -423,6 +433,9 @@ test("a normal saved draft remains exportable when the refreshed survey is close
   );
   globalThis.fetch = async () => reply({ error: "问卷已结束" }, 403);
   await mount(React.createElement(Survey, { id: "review" }));
+  assert.equal(container.querySelector('input[type="radio"]'), null);
+  await click(named("恢复本机填写记录"));
+  await click(named("恢复此记录"));
   assert.equal(
     container.querySelectorAll('input[type="radio"]')[1].checked,
     true,
@@ -433,7 +446,7 @@ test("a normal saved draft remains exportable when the refreshed survey is close
     answers,
   );
   assert.deepEqual(
-    JSON.parse(localStorage.getItem("survey-review")).answers,
+    surveyRecords(localStorage, "review", "draft")[0].answers,
     answers,
   );
 });
@@ -503,9 +516,10 @@ test("survey response loss followed by 429 and 408 keeps the pending key and ver
   await submit();
   for (let retry = 0; retry < 2; retry++) {
     await click(named("重试确认提交结果"));
-    const stored = JSON.parse(localStorage.getItem("survey-review"));
-    assert.equal(stored.pending, true);
-    assert.equal(stored.submissionKey, bodies[0].submissionKey);
+    const stored = surveyRecords(localStorage, "review", "pending")[0];
+    assert.equal(stored.kind, "pending");
+    assert.equal(stored.body.submissionKey, bodies[0].submissionKey);
+    assert.equal(stored.body.definitionVersion, bodies[0].definitionVersion);
   }
   await remountSurvey();
   await click(named("重试确认提交结果"));

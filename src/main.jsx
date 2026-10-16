@@ -1,4 +1,11 @@
-import React, { useEffect, useLayoutEffect, useState, useRef, lazy, Suspense } from "react";
+import React, {
+  useEffect,
+  useLayoutEffect,
+  useState,
+  useRef,
+  lazy,
+  Suspense,
+} from "react";
 import { createPortal, flushSync } from "react-dom";
 import {
   ArrowUpRight,
@@ -21,11 +28,12 @@ import {
   buildPublicPageMetadata,
   resolvePageRoute,
 } from "../shared/page-info.js";
-import { quotes } from "./quotes";
+import { Intro, TypeQuote } from "./home-experience.jsx";
+export { Intro, TypeQuote } from "./home-experience.jsx";
 import Survey from "./survey";
 import ArticleContent from "./article-content";
 import { ProfileFields } from "./profile-fields";
-import { sessionState, newSubmissionKey } from "./browser-state.js";
+import { newSubmissionKey } from "./browser-state.js";
 import ModuleBoundary from "./module-boundary.jsx";
 import ThemeToggle from "./theme.jsx";
 import { dismissFromPointer } from "./theme-state.js";
@@ -68,123 +76,31 @@ export function Text({ children }) {
     </div>
   );
 }
-export function Intro() {
-  const [show, setShow] = useState(() => !sessionState.getItem("greeted"));
-  const [word, setWord] = useState(0);
-  const finish = () => {
-    sessionState.setItem("greeted", "1");
-    setShow(false);
-  };
-  useEffect(() => {
-    if (!show) return;
-    if (matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      finish();
-      return;
-    }
-    const interval = setInterval(() => setWord((x) => x + 1), 440);
-    const t = setTimeout(finish, 2600);
-    return () => {
-      clearInterval(interval);
-      clearTimeout(t);
-    };
-  }, [show]);
-  return (
-    show && (
-      <div className="intro" role="dialog" aria-label="欢迎">
-        <span className="hello">
-          {
-            ["Hello", "你好", "Bonjour", "Hola", "こんにちは", "Hello"][
-              word % 6
-            ]
-          }
-          <span className="cursor">_</span>
-        </span>
-        <button onClick={finish}>
-          跳过 <ArrowRight />
-        </button>
-        <span className="intro-caption">A SMALL SPACE IN A BIG WORLD</span>
-      </div>
-    )
-  );
-}
-function TypeQuote() {
-  const [text, setText] = useState("");
-  useEffect(() => {
-    let timer,
-      disposed = false;
-    let previous = -1;
-    const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const choose = () => {
-      let n;
-      do {
-        n = Math.floor(Math.random() * quotes.length);
-      } while (n === previous);
-      previous = n;
-      return quotes[n][Math.random() < 0.5 ? 0 : 1];
-    };
-    let sentence = choose();
-    let visible = "";
-    const step = () => {
-      if (disposed) return;
-      if (visible.length < sentence.length) {
-        visible = sentence.slice(0, visible.length + 1);
-        setText(visible);
-        timer = setTimeout(step, /[\u4e00-\u9fff]/.test(sentence) ? 95 : 45);
-      } else timer = setTimeout(erase, 15000);
-    };
-    const erase = () => {
-      if (disposed) return;
-      if (reduced) {
-        sentence = choose();
-        visible = sentence;
-        setText(visible);
-        timer = setTimeout(erase, 15000);
-        return;
-      }
-      if (visible.length) {
-        visible = visible.slice(0, -1);
-        setText(visible);
-        timer = setTimeout(erase, 22);
-      } else {
-        sentence = choose();
-        timer = setTimeout(step, 400);
-      }
-    };
-    if (reduced) {
-      visible = sentence;
-      setText(sentence);
-      timer = setTimeout(erase, 15000);
-    } else
-      timer = setTimeout(step, sessionState.getItem("greeted") ? 550 : 2900);
-    return () => {
-      disposed = true;
-      clearTimeout(timer);
-    };
-  }, []);
-  return (
-    <p className="typed" aria-label="首页文案">
-      {text}
-      <span className="cursor">|</span>
-    </p>
-  );
-}
 function App() {
   const [data, setData] = useState(null),
     [error, setError] = useState(""),
     [menu, setMenu] = useState(false);
   // Completion belongs to this document visit, never to storage or another tab.
-  const [visit, setVisit] = useState(() => ({ url: location.href, sequence: 0 }));
+  const [visit, setVisit] = useState(() => ({
+    url: location.href,
+    sequence: 0,
+  }));
   const visitRef = useRef(visit);
   visitRef.current = visit;
   const [confirmedVisit, setConfirmedVisit] = useState(null);
   useLayoutEffect(() => {
     const restart = () => {
-      const next = { url: location.href, sequence: visitRef.current.sequence + 1 };
+      const next = {
+        url: location.href,
+        sequence: visitRef.current.sequence + 1,
+      };
       visitRef.current = next;
       flushSync(() => {
         setVisit(next);
         setConfirmedVisit(null);
         setMenu(false);
+        setExploreRequest(null);
+        setExploring(false);
       });
     };
     const restore = (event) => {
@@ -201,6 +117,16 @@ function App() {
     };
   }, []);
   const menuToggle = useRef(null);
+  const mobileMenu = useRef(null);
+  const hero = useRef(null);
+  const heroScene = useRef(null);
+  const [exploreRequest, setExploreRequest] = useState(null);
+  const [exploring, setExploring] = useState(false);
+  const [heroVisible, setHeroVisible] = useState(true);
+  const requestExplore = (event) => {
+    setMenu(false);
+    setExploreRequest({ opener: event.currentTarget });
+  };
   const backdropPointer = useRef(null);
   const closeMenu = () => {
     setMenu(false);
@@ -208,10 +134,31 @@ function App() {
   };
   useEffect(() => {
     if (!menu) return;
+    const panel = mobileMenu.current;
+    if (panel) {
+      panel.scrollTop = 0;
+      panel.querySelector("button, a[href]")?.focus({ preventScroll: true });
+    }
     const closeOnEscape = (event) => {
-      if (event.key !== "Escape") return;
-      setMenu(false);
-      menuToggle.current?.focus({ preventScroll: true });
+      if (event.key === "Escape") {
+        event.preventDefault();
+        closeMenu();
+      }
+      if (event.key === "Tab" && panel) {
+        const items = [
+          ...panel.querySelectorAll("a[href],button:not([disabled])"),
+        ];
+        const at = items.indexOf(document.activeElement);
+        // This drawer is non-modal: leaving either end closes it and returns to
+        // its opener. No focus trap, inert background or document scroll lock.
+        if (
+          (event.shiftKey && at <= 0) ||
+          (!event.shiftKey && at === items.length - 1)
+        ) {
+          event.preventDefault();
+          closeMenu();
+        }
+      }
     };
     const desktop = matchMedia("(min-width: 760px)");
     const closeOnDesktop = (event) => {
@@ -231,6 +178,20 @@ function App() {
   const detailKind = route.collection ? route.type : null;
   const detailPage = route.page;
   const page = route.page;
+  const home = page === "home" && route.type === "page";
+  useEffect(() => {
+    if (!home || !hero.current) return;
+    const element = hero.current;
+    const update = () =>
+      setHeroVisible(element.getBoundingClientRect().bottom > 0);
+    update();
+    window.addEventListener("scroll", update, { passive: true });
+    window.addEventListener("resize", update);
+    return () => {
+      window.removeEventListener("scroll", update);
+      window.removeEventListener("resize", update);
+    };
+  }, [home, data]);
   const [detail, setDetail] = useState(null);
   const [detailError, setDetailError] = useState(null);
   const [detailLoading, setDetailLoading] = useState(!!route.collection);
@@ -357,119 +318,139 @@ function App() {
       >
         跳到主要内容
       </a>
-      {!standaloneEntry && <Intro />}
-      {!standalone && <ModuleBoundary label="3D 场景" quiet>
-        <Suspense fallback={null}>
-          <Space
-            home={
-              page === "home" &&
-              !detailKind &&
-              !query.has("answer") &&
-              !query.has("survey")
-            }
-          />
-        </Suspense>
-      </ModuleBoundary>}
+      {home && <Intro />}
+      {!standalone && (
+        <ModuleBoundary label="3D 场景" quiet>
+          <Suspense fallback={null}>
+            <Space
+              key={visit.sequence}
+              home={home}
+              sceneTarget={heroScene}
+              openRequest={exploreRequest}
+              onRequestHandled={(request) =>
+                setExploreRequest((current) =>
+                  current === request ? null : current,
+                )
+              }
+              showToggle={
+                !menu && route.type !== "survey" && (!home || !heroVisible)
+              }
+              onOpen={() => setMenu(false)}
+              onActiveChange={setExploring}
+            />
+          </Suspense>
+        </ModuleBoundary>
+      )}
       <div
         className={`site-content ${page === "home" && !detailKind ? "is-home" : ""} ${standalone ? "standalone-survey" : ""}`}
       >
-        {standalone && <div className="standalone-survey-tools"><ThemeToggle /></div>}
-        {!standalone && <header className={`header ${menu ? "menu-is-open" : ""}`}>
-          <a className="wordmark" href="/">
-            {p.name}
-            <span>PERSONAL SPACE</span>
-          </a>
-          <button
-            ref={menuToggle}
-            type="button"
-            className="menu-toggle"
-            aria-label={menu ? "关闭导航" : "打开导航"}
-            aria-expanded={menu}
-            aria-controls="mobile-navigation"
-            onClick={() => setMenu(!menu)}
-          >
-            {menu ? <X /> : <MenuIcon />}
-          </button>
-          {createPortal(
-            <div className={`mobile-menu-layer ${menu ? "open" : ""}`}>
-              <div
-                className={`mobile-menu-surface ${menu ? "open" : ""}`}
-                aria-hidden="true"
-              />
-              <div
-                className={`menu-backdrop ${menu ? "open" : ""}`}
-                aria-hidden="true"
-                onPointerDown={(event) => {
-                  backdropPointer.current = {
-                    clientX: event.clientX,
-                    clientY: event.clientY,
-                  };
-                }}
-                onPointerUp={(event) => {
-                  if (dismissFromPointer(backdropPointer.current, event))
-                    closeMenu();
-                  backdropPointer.current = null;
-                }}
-                onPointerMove={(event) => {
-                  if (!dismissFromPointer(backdropPointer.current, event))
+        {standalone && (
+          <div className="standalone-survey-tools">
+            <ThemeToggle />
+          </div>
+        )}
+        {!standalone && (
+          <header className={`header ${menu ? "menu-is-open" : ""}`}>
+            <a className="wordmark" href="/">
+              {p.name}
+              <span>PERSONAL SPACE</span>
+            </a>
+            <button
+              ref={menuToggle}
+              type="button"
+              className="menu-toggle"
+              aria-label={menu ? "关闭导航" : "打开导航"}
+              aria-expanded={menu}
+              aria-controls="mobile-navigation"
+              disabled={exploring}
+              onClick={() => setMenu(!menu)}
+            >
+              {menu ? <X /> : <MenuIcon />}
+            </button>
+            {createPortal(
+              <div className={`mobile-menu-layer ${menu ? "open" : ""}`}>
+                <div
+                  className={`mobile-menu-surface ${menu ? "open" : ""}`}
+                  aria-hidden="true"
+                />
+                <div
+                  className={`menu-backdrop ${menu ? "open" : ""}`}
+                  aria-hidden="true"
+                  onPointerDown={(event) => {
+                    backdropPointer.current = {
+                      clientX: event.clientX,
+                      clientY: event.clientY,
+                    };
+                  }}
+                  onPointerUp={(event) => {
+                    if (dismissFromPointer(backdropPointer.current, event))
+                      closeMenu();
                     backdropPointer.current = null;
-                }}
-                onPointerCancel={() => {
-                  backdropPointer.current = null;
-                }}
-                onClick={(event) => {
-                  if (event.detail === 0) closeMenu();
-                }}
-              />
-              <nav
-                id="mobile-navigation"
-                aria-label="手机导航"
-                className={`mobile-navigation ${menu ? "open" : ""}`}
-              >
-                <div className="mobile-menu-top">
-                  <ThemeToggle label />
-                  <button
-                    type="button"
-                    className="menu-close"
-                    aria-label="关闭导航"
-                    onClick={closeMenu}
-                  >
-                    <X size={23} />
-                  </button>
-                </div>
-                {nav.map(([key, label], index) => (
-                  <a
-                    className={page === key ? "active" : ""}
-                    aria-current={page === key ? "page" : undefined}
-                    key={key}
-                    style={{
-                      "--nav-order": index,
-                      "--nav-reverse-order": nav.length - 1 - index,
-                    }}
-                    href={"/?page=" + key}
-                    onClick={() => setMenu(false)}
-                  >
-                    {label}
-                  </a>
-                ))}
-              </nav>
-            </div>,
-            document.body,
-          )}
-          <nav aria-label="主要导航" className="desktop-navigation">
-            {nav.map(([key, label]) => (
-              <a
-                className={page === key ? "active" : ""}
-                aria-current={page === key ? "page" : undefined}
-                key={key}
-                href={"/?page=" + key}
-              >
-                {label}
-              </a>
-            ))}
-          </nav>
-          <ThemeToggle className="desktop-theme-toggle" />
-        </header>}
+                  }}
+                  onPointerMove={(event) => {
+                    if (!dismissFromPointer(backdropPointer.current, event))
+                      backdropPointer.current = null;
+                  }}
+                  onPointerCancel={() => {
+                    backdropPointer.current = null;
+                  }}
+                  onClick={(event) => {
+                    if (event.detail === 0) closeMenu();
+                  }}
+                />
+                <nav
+                  ref={mobileMenu}
+                  id="mobile-navigation"
+                  aria-label="手机导航"
+                  inert={!menu ? true : undefined}
+                  aria-hidden={!menu}
+                  className={`mobile-navigation ${menu ? "open" : ""}`}
+                >
+                  <div className="mobile-menu-top">
+                    <ThemeToggle label />
+                    <button
+                      type="button"
+                      className="menu-close"
+                      aria-label="关闭导航"
+                      onClick={closeMenu}
+                    >
+                      <X size={23} />
+                    </button>
+                  </div>
+                  {nav.map(([key, label], index) => (
+                    <a
+                      className={page === key ? "active" : ""}
+                      aria-current={page === key ? "page" : undefined}
+                      key={key}
+                      style={{
+                        "--nav-order": index,
+                        "--nav-reverse-order": nav.length - 1 - index,
+                      }}
+                      href={"/?page=" + key}
+                      onClick={() => setMenu(false)}
+                    >
+                      {label}
+                    </a>
+                  ))}
+                </nav>
+              </div>,
+              document.body,
+            )}
+            <nav aria-label="主要导航" className="desktop-navigation">
+              {nav.map(([key, label]) => (
+                <a
+                  className={page === key ? "active" : ""}
+                  aria-current={page === key ? "page" : undefined}
+                  key={key}
+                  href={"/?page=" + key}
+                >
+                  {label}
+                </a>
+              ))}
+            </nav>
+            <ThemeToggle className="desktop-theme-toggle" />
+          </header>
+        )}
         <main id="main-content" tabIndex={-1}>
           {route.type === "answer" ? (
             <Answer token={query.get("answer")} />
@@ -520,28 +501,37 @@ function App() {
             <>
               {page === "home" && (
                 <>
-                  <section className="hero">
-                    <div className="hero-kicker">
-                      <span className="dot" /> 一个不断生长的个人空间
+                  <section className="hero universe-hero" ref={hero}>
+                    <div className="hero-copy">
+                      <div className="hero-kicker">
+                        <span className="dot" /> 一个不断生长的个人空间
+                      </div>
+                      <h1>
+                        {p.name}
+                        <span className="name-en">LIN JIACHENG</span>
+                      </h1>
+                      <TypeQuote />
                     </div>
-                    <h1>
-                      {p.name}
-                      <span className="name-en">LIN JIACHENG</span>
-                    </h1>
-                    <TypeQuote />
+                    <div
+                      className="hero-scene"
+                      ref={heroScene}
+                      aria-hidden="true"
+                    />
                     <div className="hero-actions">
-                      <a className="button copper-button" href="/solar/">
-                        探索太阳系 <ArrowUpRight />
-                      </a>
-                      <a className="hero-secondary" href="#explore">
-                        走进我的空间 <ArrowRight />
+                      <button
+                        type="button"
+                        className="button hero-explore-button"
+                        aria-haspopup="dialog"
+                        onClick={requestExplore}
+                      >
+                        自由探索 <ArrowRight />
+                      </button>
+                      <a className="hero-secondary" href="#home-next">
+                        慢慢往下看 <ArrowRight />
                       </a>
                     </div>
                     <div className="hero-bottom">
                       <span>克制 / 好奇 / 浪漫</span>
-                      <a href="#explore">
-                        慢慢往下看 <ArrowRight />
-                      </a>
                     </div>
                     <div className="scene-caption" aria-hidden="true">
                       <span className="scene-caption-line" />
@@ -551,6 +541,7 @@ function App() {
                     </div>
                   </section>
                   <section
+                    id="home-next"
                     className="solar-feature"
                     aria-labelledby="solar-feature-title"
                   >
@@ -850,14 +841,16 @@ function App() {
             </>
           )}
         </main>
-        {!standalone && <footer>
-          <a href="/">林珈诚 · 个人空间</a>
-          <span>慢慢认识世界，也慢慢认识自己。</span>
-          <a href="/?page=admin">
-            管理 <ArrowUpRight />
-          </a>
-          <small>© {new Date().getFullYear()} LIN JIACHENG</small>
-        </footer>}
+        {!standalone && (
+          <footer>
+            <a href="/">林珈诚 · 个人空间</a>
+            <span>慢慢认识世界，也慢慢认识自己。</span>
+            <a href="/?page=admin">
+              管理 <ArrowUpRight />
+            </a>
+            <small>© {new Date().getFullYear()} LIN JIACHENG</small>
+          </footer>
+        )}
       </div>
     </>
   );

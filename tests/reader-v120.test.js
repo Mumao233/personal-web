@@ -45,6 +45,8 @@ before(async () => {
     "localStorage",
     "sessionStorage",
     "matchMedia",
+    "requestAnimationFrame",
+    "cancelAnimationFrame",
   ]) {
     originals.set(key, Object.getOwnPropertyDescriptor(globalThis, key));
     Object.defineProperty(globalThis, key, {

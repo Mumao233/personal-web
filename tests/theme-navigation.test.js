@@ -128,7 +128,8 @@ test("mobile frosting feathers its whole surface separately from opaque scrollin
   assert.match(surface, /backdrop-filter:\s*blur\(6px\)/);
   assert.match(surface, /mask-image:\s*linear-gradient/);
   assert.match(surface, /transparent 0/);
-  assert.match(surface, /#000 80px/);
+  // The feather must become opaque before the narrowest 36px text inset.
+  assert.match(surface, /#000 32px/);
   assert.match(navigation, /background:\s*transparent/);
   assert.doesNotMatch(navigation, /backdrop-filter|mask-image/);
   assert.ok(

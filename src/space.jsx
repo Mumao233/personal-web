@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
   ArrowLeft,
   ArrowUpRight,
@@ -137,27 +137,29 @@ function Scene({ exploring, home, reduced, anchors, command, onState }) {
         rim.position.set(5, 0, -3);
         scene.add(rim);
         const globe = new THREE.Mesh(
-          own(new THREE.SphereGeometry(1.45, 64, 48)),
+          own(new THREE.SphereGeometry(1.85, 64, 48)),
           own(
             new THREE.MeshStandardMaterial({
-              color: 0x30271f,
+              color: state.current.theme === "light" ? 0x704b2c : 0x493222,
               roughness: 0.57,
               metalness: 0.5,
             }),
           ),
         );
         system.add(globe);
+        const globeFrom = globe.material.color.clone();
+        const globeTo = globe.material.color.clone();
         const grid = new THREE.LineSegments(
           own(
             new THREE.WireframeGeometry(
-              own(new THREE.SphereGeometry(1.462, 32, 16)),
+              own(new THREE.SphereGeometry(1.862, 32, 16)),
             ),
           ),
           own(
             new THREE.LineBasicMaterial({
               color: 0xa58360,
               transparent: true,
-              opacity: 0.11,
+              opacity: 0.06,
             }),
           ),
         );
@@ -187,9 +189,9 @@ function Scene({ exploring, home, reduced, anchors, command, onState }) {
         }
         ring(2.3, 0.2, 0.7);
         ring(3.0, -0.24, 0.34);
-        ring(3.8, 0.1, 0.28);
-        ring(4.8, 0.15, 0.18);
-        ring(5.5, 0.15, 0.1);
+        ring(3.4, 0.1, 0.28);
+        ring(3.8, 0.15, 0.18);
+        ring(4.1, 0.15, 0.1);
         ring(2.05, 1.28, 0.3, 0x7297a8);
         const nodes = destinations.map((d, index) => {
           const group = new THREE.Group();
@@ -263,7 +265,7 @@ function Scene({ exploring, home, reduced, anchors, command, onState }) {
           returning = false;
         command.current = (action) => {
           if (action === "reset") {
-            const narrow = mount.current.clientWidth < 760;
+            const narrow = window.innerWidth < 760;
             camera.position.set(0, narrow ? 5.5 : 4.4, narrow ? 30 : 16);
             controls.target.set(0, 0, 0);
           } else {
@@ -292,14 +294,21 @@ function Scene({ exploring, home, reduced, anchors, command, onState }) {
             themeStarted = time;
             themeFrom.copy(scene.fog.color);
             themeTo.set(sceneTheme === "light" ? 0xf6f2e9 : 0x050505);
+            globeFrom.copy(globe.material.color);
+            globeTo.set(sceneTheme === "light" ? 0x704b2c : 0x493222);
           }
           scene.fog.color.lerpColors(
             themeFrom,
             themeTo,
             Math.min(1, (time - themeStarted) / (quiet ? 80 : 250)),
           );
+          globe.material.color.lerpColors(
+            globeFrom,
+            globeTo,
+            Math.min(1, (time - themeStarted) / (quiet ? 80 : 250)),
+          );
           const width = mount.current.clientWidth,
-            narrow = width < 760;
+            narrow = window.innerWidth < 760;
           if (free !== previousMode) {
             controls.enabled = free;
             if (free) {
@@ -308,18 +317,15 @@ function Scene({ exploring, home, reduced, anchors, command, onState }) {
             } else returning = true;
             previousMode = free;
           }
-          const progress = THREE.MathUtils.clamp(
-            window.scrollY / Math.max(window.innerHeight * 1.5, 1),
-            0,
-            2,
-          );
           const blend = quiet ? 1 : 1 - Math.exp(-delta * 4.5);
           if (!free) {
-            targetPosition.set(
-              progress * 1.3,
-              2.5 + progress * 2.2,
-              (narrow ? 18 : 13.5) - progress * 1.6,
+            // The reading canvas shares the actual hero scene box, rather than
+            // guessing where text will land in a viewport-sized background.
+            const distance = Math.max(
+              7.5,
+              8.7 / (2 * Math.tan(Math.PI / 9) * camera.aspect),
             );
+            targetPosition.set(0, 2.4, distance);
             targetLook.set(0, 0, 0);
             camera.position.lerp(targetPosition, blend);
             controls.target.lerp(targetLook, blend);
@@ -327,13 +333,7 @@ function Scene({ exploring, home, reduced, anchors, command, onState }) {
             if (returning && camera.position.distanceTo(targetPosition) < 0.02)
               returning = false;
           }
-          const x = free
-            ? 0
-            : narrow
-              ? 0.7 - progress * 0.55
-              : 2.5 - progress * 1.4;
-          const y = free ? 0 : narrow ? -1.35 : -0.3;
-          system.position.lerp(targetPosition.set(x, y, 0), blend);
+          system.position.lerp(targetPosition.set(0, 0, 0), blend);
           if (!quiet && !free) {
             globe.rotation.y += delta * 0.035;
             system.rotation.y += delta * 0.007;
@@ -420,10 +420,21 @@ function Scene({ exploring, home, reduced, anchors, command, onState }) {
   return <div ref={mount} className="space-canvas" />;
 }
 
-export default function Space({ home = false }) {
+export default function Space({
+  home = false,
+  sceneTarget,
+  openRequest,
+  showToggle = true,
+  onOpen,
+  onActiveChange,
+  onRequestHandled,
+}) {
   const [exploring, setExploring] = useState(false),
     [closing, setClosing] = useState(false);
   const [sceneState, setSceneState] = useState("loading");
+  const [compactExplorer, setCompactExplorer] = useState(
+    () => matchMedia("(max-height: 480px)").matches,
+  );
   const [reduced, setReduced] = useState(
     () => matchMedia("(prefers-reduced-motion: reduce)").matches,
   );
@@ -432,8 +443,47 @@ export default function Space({ home = false }) {
     dialog = useRef(null),
     toggle = useRef(null),
     savedScroll = useRef(0),
-    exitTimer = useRef(null);
+    exitTimer = useRef(null),
+    focusFrame = useRef(null),
+    closingRef = useRef(false),
+    opener = useRef(null),
+    latestRequest = useRef(null);
   const active = exploring || closing;
+  const [readingBounds, setReadingBounds] = useState(null);
+  useLayoutEffect(() => {
+    const target = sceneTarget?.current;
+    if (!home || !target) return;
+    const measure = () => {
+      const box = target.getBoundingClientRect();
+      setReadingBounds({
+        position: "absolute",
+        inset: "auto",
+        left: box.left + window.scrollX,
+        top: box.top + window.scrollY,
+        width: box.width,
+        height: box.height,
+      });
+    };
+    measure();
+    const observer =
+      typeof ResizeObserver === "function" ? new ResizeObserver(measure) : null;
+    observer?.observe(target);
+    if (target.parentElement) observer?.observe(target.parentElement);
+    window.addEventListener("resize", measure);
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener("resize", measure);
+    };
+  }, [home, sceneTarget, active]);
+  useEffect(() => {
+    onActiveChange?.(active);
+  }, [active, onActiveChange]);
+  useEffect(() => {
+    const media = matchMedia("(max-height: 480px)");
+    const update = () => setCompactExplorer(media.matches);
+    media.addEventListener?.("change", update);
+    return () => media.removeEventListener?.("change", update);
+  }, []);
   useEffect(() => {
     const mq = matchMedia("(prefers-reduced-motion: reduce)");
     const update = () => setReduced(mq.matches);
@@ -441,6 +491,7 @@ export default function Space({ home = false }) {
     return () => {
       mq.removeEventListener("change", update);
       clearTimeout(exitTimer.current);
+      cancelAnimationFrame(focusFrame.current);
     };
   }, []);
   useEffect(() => {
@@ -454,36 +505,60 @@ export default function Space({ home = false }) {
       if (page) page.inert = false;
     };
   }, [active]);
-  const open = () => {
+  const open = (source) => {
     clearTimeout(exitTimer.current);
-    savedScroll.current = window.scrollY;
+    exitTimer.current = null;
+    cancelAnimationFrame(focusFrame.current);
+    focusFrame.current = null;
+    closingRef.current = false;
+    if (!active) savedScroll.current = window.scrollY;
+    opener.current = source?.currentTarget || source || toggle.current;
+    onOpen?.();
     setClosing(false);
     setExploring(true);
-    requestAnimationFrame(() =>
-      dialog.current?.querySelector("button")?.focus(),
-    );
   };
+  useLayoutEffect(() => {
+    if (!exploring) return;
+    dialog.current?.querySelector("button")?.focus({ preventScroll: true });
+  }, [exploring]);
+  useEffect(() => {
+    if (!openRequest || latestRequest.current === openRequest) return;
+    latestRequest.current = openRequest;
+    open(openRequest.opener);
+    onRequestHandled?.(openRequest);
+  }, [openRequest]);
   const close = () => {
+    if (closingRef.current) return;
+    closingRef.current = true;
+    clearTimeout(exitTimer.current);
+    cancelAnimationFrame(focusFrame.current);
     setExploring(false);
     setClosing(true);
     // The reading document stays mounted, preserving forms and its exact scroll position.
     window.scrollTo({ top: savedScroll.current, behavior: "instant" });
     exitTimer.current = setTimeout(
       () => {
+        exitTimer.current = null;
         setClosing(false);
-        requestAnimationFrame(() =>
-          toggle.current?.focus({ preventScroll: true }),
-        );
+        focusFrame.current = requestAnimationFrame(() => {
+          if (!closingRef.current) return;
+          closingRef.current = false;
+          (opener.current?.isConnected
+            ? opener.current
+            : toggle.current || document.getElementById("main-content")
+          )?.focus({ preventScroll: true });
+          focusFrame.current = null;
+        });
       },
       reduced ? 0 : 650,
     );
   };
   useEffect(() => {
-    if (!exploring) return;
+    if (!active) return;
     const keydown = (event) => {
       if (event.key === "Escape") {
         event.preventDefault();
-        close();
+        if (!closing) close();
       }
       if (event.key === "Tab") {
         const nodes = [
@@ -491,7 +566,10 @@ export default function Space({ home = false }) {
         ].filter((el) => getComputedStyle(el).visibility !== "hidden");
         const first = nodes[0],
           last = nodes[nodes.length - 1];
-        if (event.shiftKey && document.activeElement === first) {
+        if (!dialog.current.contains(document.activeElement)) {
+          event.preventDefault();
+          (event.shiftKey ? last : first)?.focus();
+        } else if (event.shiftKey && document.activeElement === first) {
           event.preventDefault();
           last?.focus();
         } else if (!event.shiftKey && document.activeElement === last) {
@@ -502,12 +580,21 @@ export default function Space({ home = false }) {
     };
     document.addEventListener("keydown", keydown);
     return () => document.removeEventListener("keydown", keydown);
-  }, [exploring, reduced]);
+  }, [active, closing, reduced]);
   return (
     <>
       {(home || active) && (
         <div
           className={`space-stage ${active ? "is-exploring" : "is-reading"} ${closing ? "is-returning" : ""} ${sceneState === "unavailable" ? "has-fallback" : ""}`}
+          style={
+            !active && sceneTarget
+              ? {
+                  ...readingBounds,
+                  visibility: readingBounds ? "visible" : "hidden",
+                }
+              : undefined
+          }
+          data-scene-state={sceneState}
         >
           <Scene
             exploring={exploring}
@@ -538,16 +625,22 @@ export default function Space({ home = false }) {
                   <span className="eyebrow">A SMALL PERSONAL UNIVERSE</span>
                   <h2 id="space-title">换个角度，认识我。</h2>
                   <p>
-                    {sceneState === "unavailable"
+                    {sceneState !== "ready"
                       ? "3D 暂时不可用，也可以从这些入口继续。"
-                      : "拖动旋转 · 滚轮或双指缩放 · 点击一处光点"}
+                      : compactExplorer
+                        ? "拖动旋转 · 滚轮或双指缩放 · 从下方栏目继续"
+                        : "拖动旋转 · 滚轮或双指缩放 · 点击一处光点"}
                   </p>
                 </div>
-                <button onClick={close} className="space-close">
+                <button
+                  onClick={close}
+                  className="space-close"
+                  disabled={closing}
+                >
                   <ArrowLeft /> 返回阅读 <X />
                 </button>
               </div>
-              {sceneState === "ready" && (
+              {sceneState === "ready" && !compactExplorer && (
                 <div className="space-anchors">
                   {destinations.map((d, i) => (
                     <a
@@ -605,7 +698,7 @@ export default function Space({ home = false }) {
           )}
         </div>
       )}
-      {!active && (
+      {!active && showToggle && (
         <button
           ref={toggle}
           className="space-toggle"
