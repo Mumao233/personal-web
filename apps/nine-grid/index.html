@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#050505" />
+    <script>
+      // Use the website's explicit preference before the first frame is painted.
+      try {
+        const theme = localStorage.getItem('personal-space-theme') === 'light' ? 'light' : 'dark';
+        document.documentElement.dataset.theme = theme;
+        document.documentElement.style.colorScheme = theme;
+        document.querySelector('meta[name="theme-color"]').content = theme === 'light' ? '#f6f2e9' : '#050505';
+      } catch {}
+    </script>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="stylesheet" href="/fonts/noto-sans-sc.css" />
+    <link rel="canonical" href="https://mumao.site/nine-grid/" />
+    <meta name="description" content="林珈诚个人空间中的九格图片工具：自由排版、调整裁切、批量高清导出，照片仅在你的浏览器中处理。" />
+    <meta property="og:title" content="九格 · 图片工具 · 林珈诚的个人空间" />
+    <meta property="og:description" content="在浏览器中制作九宫格图片，自由留白、调整裁切，导出高清 PNG。" />
+    <meta property="og:url" content="https://mumao.site/nine-grid/" />
+    <meta property="og:type" content="website" />
+    <title>九格 · 图片工具 · 林珈诚的个人空间</title>
+  </head>
+  <body><div id="root"></div><script type="module" src="/src/main.tsx"></script></body>
+</html>

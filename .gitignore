@@ -9,3 +9,9 @@ atlas/evidence/
 *.pyc
 deliveries/
 .qa/
+/work/
+/outputs/
+/public/nine-grid/
+**/test-results/
+**/playwright-report/
+*.tsbuildinfo

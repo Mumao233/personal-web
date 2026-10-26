@@ -42,6 +42,7 @@ import "./style.css";
 import "./space.css";
 import "./navigation.css";
 import "./survey-entry.css";
+import "./nine-grid-project.css";
 const Admin = lazy(() => import("./admin"));
 const World = lazy(() => import("./world"));
 const Space = lazy(() => import("./space"));
@@ -707,6 +708,18 @@ function App() {
                     <span className="text-link">
                       打开完整作品 <ArrowUpRight />
                     </span>
+                  </a>
+                  <a className="nine-grid-project-entry" href="/nine-grid/">
+                    <div className="nine-grid-project-copy">
+                      <span className="eyebrow">PHOTO TOOL · 九格</span>
+                      <h2>九格 · 图片生成器 <ArrowUpRight /></h2>
+                      <p>把日常装进九个小格。自由排版、调整裁切，留一点白，再清晰地保存。</p>
+                      <span className="nine-grid-project-details">浏览器本地处理 · 高清 PNG · 批量导出</span>
+                      <span className="text-link">开始制作 <ArrowUpRight /></span>
+                    </div>
+                    <div className="nine-grid-project-art" aria-hidden="true">
+                      {Array.from({ length: 9 }, (_, index) => <span key={index} />)}
+                    </div>
                   </a>
                   {data.projects.length ? (
                     <div className="work-grid">

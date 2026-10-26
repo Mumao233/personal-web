@@ -805,6 +805,18 @@ app.get(
   }),
 );
 registerMediaRoutes(app, auth);
+// The photo tool is a first-party page. Serve its own document rather than
+// falling through to the personal-homepage SPA (static index is disabled).
+app.get(["/nine-grid", "/nine-grid/"], asyncRoute(async (req, res) => {
+  if (!req.path.endsWith("/")) {
+    const search = new URL(req.originalUrl, "http://localhost").search;
+    return res.redirect(308, `/nine-grid/${search}`);
+  }
+  const directory = process.argv.includes("--production") ? "dist" : "public";
+  res.set("Cache-Control", "no-store").type("html").send(
+    await readFile(resolve(directory, "nine-grid/index.html"), "utf8"),
+  );
+}));
 function pageHtml(html, req) {
   return injectPageMetadata(html, buildPublicPageMetadata({
     url: req.originalUrl,

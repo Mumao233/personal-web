@@ -22,7 +22,13 @@ function newest(path) {
   const info = statSync(path);
   return info.isDirectory() ? Math.max(info.mtimeMs, ...readdirSync(path).map(name => newest(resolve(path, name)))) : info.mtimeMs;
 }
-if (['src', 'public', 'index.html', 'vite.config.js', 'package-lock.json'].some(path => newest(path) > built)) npm(['run', 'build']);
+const buildInputs = ['src', 'public', 'index.html', 'vite.config.js', 'package-lock.json',
+  'apps/nine-grid/src', 'apps/nine-grid/public', 'apps/nine-grid/index.html',
+  'apps/nine-grid/vite.config.ts', 'apps/nine-grid/tsconfig.json', 'apps/nine-grid/package-lock.json'];
+if (!existsSync('dist/nine-grid/index.html') || buildInputs.some(path => newest(path) > built)) {
+  if (!existsSync('apps/nine-grid/node_modules/vite/package.json')) npm(['ci', '--prefix', 'apps/nine-grid', '--no-audit', '--no-fund']);
+  npm(['run', 'build']);
+}
 const port = process.env.PORT || '5193';
 try {
   const response = await fetch(`http://127.0.0.1:${port}/api/health`, { signal: AbortSignal.timeout(1000) });
