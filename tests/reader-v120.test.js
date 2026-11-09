@@ -383,7 +383,7 @@ test("independent detail waits for full content instead of rendering a card summ
   );
   assert.equal(
     document.querySelector('[aria-current="page"]').textContent,
-    "作品与项目",
+    "作品",
   );
   assert.match(document.title, /完整项目/);
   await click(document.querySelector(".skip-main"));

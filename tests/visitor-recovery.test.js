@@ -7,7 +7,7 @@ import { safeStorage } from "../src/browser-state.js";
 import { unchangedAnswers } from "../src/survey-recovery.js";
 import { fakeSurveyLocks, surveyRecords } from "./survey-test-helpers.js";
 
-let dom, vite, createRoot, root, container, Questions, Survey, Intro, Boundary;
+let dom, vite, createRoot, root, container, Questions, Survey, Boundary, takeSharedHandoff;
 const descriptors = new Map();
 const originalFetch = globalThis.fetch;
 before(async () => {
@@ -57,7 +57,8 @@ before(async () => {
     optimizeDeps: { noDiscovery: true, include: [] },
     logLevel: "error",
   });
-  ({ Questions, Intro } = await vite.ssrLoadModule("/src/main.jsx"));
+  ({ Questions } = await vite.ssrLoadModule("/src/main.jsx"));
+  ({ takeSharedHandoff } = await vite.ssrLoadModule("/src/view-transition.js"));
   ({ default: Survey } = await vite.ssrLoadModule("/src/survey.jsx"));
   ({ default: Boundary } = await vite.ssrLoadModule(
     "/src/module-boundary.jsx",
@@ -135,7 +136,7 @@ const survey = () => ({
   ],
 });
 
-test("denied session storage uses memory and the actual greeting can close without crashing", async () => {
+test("denied session storage uses memory and a shared-element handoff cannot crash", async () => {
   const storage = safeStorage(() => {
     throw new DOMException("Denied", "SecurityError");
   });
@@ -154,16 +155,10 @@ test("denied session storage uses memory and the actual greeting can close witho
     },
   });
   try {
-    await mount(
-      React.createElement(
-        "div",
-        null,
-        React.createElement(Intro),
-        React.createElement("p", null, "页面仍可用"),
-      ),
+    assert.equal(
+      takeSharedHandoff({ collection: "posts", id: "missing" }),
+      null,
     );
-    assert.match(container.textContent, /页面仍可用/);
-    assert.equal(container.querySelector("[aria-label='欢迎']"), null);
   } finally {
     Object.defineProperty(globalThis, "sessionStorage", previous);
   }

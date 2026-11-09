@@ -75,19 +75,17 @@ test("manual initialization precedes React and never follows system color prefer
 });
 test("navigation confines motion to fixed menu and keeps background scrolling enabled", async () => {
   const css = await readFile(
-    new URL("../src/navigation.css", import.meta.url),
+    new URL("../src/public/base.css", import.meta.url),
     "utf8",
   );
   const jsx = await readFile(
-    new URL("../src/main.jsx", import.meta.url),
+    new URL("../src/site-chrome.jsx", import.meta.url),
     "utf8",
   );
   assert.match(css, /width:\s*80vw/);
   assert.match(css, /overscroll-behavior-y:\s*contain/);
-  assert.match(css, /300ms ease-out/);
-  assert.match(css, /180ms ease-out/);
-  assert.match(css, /80ms.*!important/);
   assert.match(css, /touch-action:\s*pan-y/);
+  assert.match(css, /transform var\(--motion-slow\) var\(--ease\)/);
   assert.match(jsx, /createPortal/);
   assert.match(jsx, /dismissFromPointer/);
   assert.match(jsx, /preventScroll:\s*true/);
@@ -110,47 +108,44 @@ test("all CSS media retain their intrinsic colors rather than theme filters", as
   assert.match(tokens, /data-theme="light"/);
   assert.match(tokens, /--space-bg:\s*#f6f2e9/);
 });
-test("mobile frosting feathers its whole surface separately from opaque scrolling text", async () => {
-  const css = await readFile(
-    new URL("../src/navigation.css", import.meta.url),
+test("public pages use one palette while only admin honors the saved theme", async () => {
+  const html = await readFile(
+    new URL("../index.html", import.meta.url),
     "utf8",
   );
-  const jsx = await readFile(
+  const admin = html.indexOf('root.dataset.surface = "admin"');
+  assert.ok(admin > 0);
+  assert.ok(html.indexOf("personal-space-theme") > html.indexOf('page === "admin"'));
+  assert.match(html, /data-surface="public"/);
+  const main = await readFile(
     new URL("../src/main.jsx", import.meta.url),
     "utf8",
   );
-  const surface = css.match(/  \.mobile-menu-surface \{([^}]+)\}/)?.[1] || "";
-  const navigation =
-    [...css.matchAll(/  \.mobile-navigation \{([^}]+)\}/g)]
-      .map((match) => match[1])
-      .find((rule) => rule.includes("background:")) || "";
-  assert.match(surface, /pointer-events:\s*none/);
-  assert.match(surface, /backdrop-filter:\s*blur\(6px\)/);
-  assert.match(surface, /mask-image:\s*linear-gradient/);
-  assert.match(surface, /transparent 0/);
-  // The feather must become opaque before the narrowest 36px text inset.
-  assert.match(surface, /#000 32px/);
-  assert.match(navigation, /background:\s*transparent/);
-  assert.doesNotMatch(navigation, /backdrop-filter|mask-image/);
-  assert.ok(
-    jsx.indexOf("className={`mobile-menu-surface") <
-      jsx.indexOf('id="mobile-navigation"'),
-  );
+  assert.doesNotMatch(main, /ThemeToggle|theme-tokens|style\.css|space\.css/);
 });
-test("frosted surface follows menu motion and has reduced-transparency fallback", async () => {
-  const css = await readFile(
-    new URL("../src/navigation.css", import.meta.url),
+test("admin keeps the previous stylesheets in their previous cascade order", async () => {
+  const styles = await readFile(
+    new URL("../src/admin-styles.js", import.meta.url),
     "utf8",
   );
-  assert.match(css, /\.mobile-menu-surface,\s*\.mobile-navigation\s*\{/);
-  assert.match(
-    css,
-    /\.mobile-menu-surface\.open,\s*\.mobile-navigation\.open\s*\{/,
+  const order = [...styles.matchAll(/import "\.\/([^"]+\.css)"/g)].map(
+    (match) => match[1],
   );
-  const fallback = css.split(
-    "@media (prefers-reduced-transparency: reduce)",
-  )[1];
-  assert.match(fallback, /\.mobile-menu-surface\s*\{/);
-  assert.match(fallback, /backdrop-filter:\s*none/);
-  assert.match(fallback, /mask-image:\s*none/);
+  assert.deepEqual(order, [
+    "survey-advanced.css",
+    "media-viewer.css",
+    "article-content.css",
+    "profile-fields.css",
+    "theme-tokens.css",
+    "style.css",
+    "space.css",
+    "navigation.css",
+    "survey-entry.css",
+    "nine-grid-project.css",
+  ]);
+  const admin = await readFile(
+    new URL("../src/admin.jsx", import.meta.url),
+    "utf8",
+  );
+  assert.ok(admin.startsWith('import "./admin-styles.js";'));
 });

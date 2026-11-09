@@ -6,81 +6,149 @@ import React, {
   lazy,
   Suspense,
 } from "react";
-import { createPortal, flushSync } from "react-dom";
-import {
-  ArrowUpRight,
-  ArrowRight,
-  ArrowLeft,
-  Plus,
-  Minus,
-  GlobeHemisphereEast,
-  Envelope,
-  WechatLogo as WeChatLogo,
-  Phone,
-  Check,
-  LockSimple,
-  X,
-  List as MenuIcon,
-} from "@phosphor-icons/react";
-import { api, date } from "./api";
+import { flushSync } from "react-dom";
+import { ArrowRight, ArrowUpRight, Check } from "@phosphor-icons/react";
+import { api } from "./api";
 import { contentDateValue } from "../shared/content-date.js";
 import {
   buildPublicPageMetadata,
   resolvePageRoute,
 } from "../shared/page-info.js";
-import { Intro, TypeQuote } from "./home-experience.jsx";
-export { Intro, TypeQuote } from "./home-experience.jsx";
 import Survey from "./survey";
 import ArticleContent from "./article-content";
-import { ProfileFields } from "./profile-fields";
 import { newSubmissionKey } from "./browser-state.js";
 import ModuleBoundary from "./module-boundary.jsx";
-import ThemeToggle from "./theme.jsx";
-import { dismissFromPointer } from "./theme-state.js";
-import "./theme-tokens.css";
-import "./style.css";
-import "./space.css";
-import "./navigation.css";
-import "./survey-entry.css";
-import "./nine-grid-project.css";
+import HomePage, { BlockTitle } from "./home-page.jsx";
+import {
+  NotFoundPage,
+  PageHead,
+  Pending,
+  PublicPage,
+  pageHeads,
+} from "./public-pages.jsx";
+import { SiteFooter, SiteHeader } from "./site-chrome.jsx";
+import { ToastProvider, useToast } from "./toast.jsx";
+import { ArticleBodySkeleton, DetailSkeleton, PageBodySkeleton } from "./skeleton.jsx";
+import { byNewest, dotDate } from "./public-format.js";
+import { takeSharedHandoff } from "./view-transition.js";
+import "./design-tokens.css";
+import "./public/base.css";
+import "./public/home.css";
+import "./public/pages.css";
+import "./public/components.css";
+export { PageHead, Text } from "./public-pages.jsx";
+
 const Admin = lazy(() => import("./admin"));
-const World = lazy(() => import("./world"));
-const Space = lazy(() => import("./space"));
-const nav = [
-  ["about", "关于我"],
-  ["projects", "作品与项目"],
-  ["notes", "随笔"],
-  ["world", "关于世界"],
-  ["you", "关于你"],
-  ["us", "关于我们"],
-];
-export function Empty({
-  title = "这里还在慢慢生长。",
-  text = "新的记录，准备好后会留在这里。",
-}) {
+const knownPages = ["home", "about", "projects", "notes", "world", "you", "us"];
+const detailLabels = {
+  post: { en: "Notes", all: "All notes", back: "回到随笔", unit: "篇" },
+  project: { en: "Selected work", all: "All work", back: "回到作品", unit: "项" },
+  story: { en: "The world", all: "All places", back: "回到影像", unit: "篇" },
+};
+
+function ArticleNav({ route, data }) {
+  const labels = detailLabels[route.type];
+  const list = data ? byNewest(data[route.collection] || [], route.collection) : [];
+  const index = list.findIndex((item) => item.id === route.id);
+  const previous = index >= 0 ? list[index + 1] : null;
   return (
-    <div className="empty">
-      <span className="empty-line" />
-      <h3>{title}</h3>
-      <p>{text}</p>
+    <nav className="article-nav" aria-label="上一篇与回到列表">
+      {previous && (
+        <a
+          className="article-nav-link"
+          href={`/?page=${route.page}&${route.type}=${encodeURIComponent(previous.id)}`}
+        >
+          <span className="article-nav-en">Previous</span>
+          <span className="article-nav-title">{previous.title}</span>
+          <span className="meta">
+            {dotDate(contentDateValue(previous, route.collection))}
+          </span>
+        </a>
+      )}
+      <a className="article-nav-link is-all" href={`/?page=${route.page}`}>
+        <span className="article-nav-en">{labels.all}</span>
+        <span className="article-nav-title">{labels.back}</span>
+        {data && (
+          <span className="meta">
+            {list.length} {labels.unit}
+          </span>
+        )}
+      </a>
+    </nav>
+  );
+}
+
+function detailKicker(route, data) {
+  const { en } = detailLabels[route.type];
+  if (route.type !== "post" || !data) return en;
+  const list = byNewest(data.posts, "posts");
+  const index = list.findIndex((item) => item.id === route.id);
+  if (index < 0) return en;
+  return `${en}, N° ${String(list.length - index).padStart(2, "0")}`;
+}
+
+function DetailView({ route, data, detail, loading, error, onRetry, handoff }) {
+  const shared = handoff?.id === route.id ? handoff : null;
+  const kicker = (
+    <a className="article-kicker" href={`/?page=${route.page}`}>
+      {detailKicker(route, data)}
+    </a>
+  );
+  return (
+    <div className="reading article-reading" data-kind={route.type}>
+      {loading ? (
+        <>
+          <p role="status" className="sr-only">
+            正在读取完整内容…
+          </p>
+          {shared ? (
+            <>
+              <ArticleContent
+                item={{ title: shared.title, cover: shared.cover }}
+                kind={route.type}
+                kicker={kicker}
+                shared={shared.part}
+              />
+              <ArticleBodySkeleton />
+            </>
+          ) : (
+            <DetailSkeleton />
+          )}
+        </>
+      ) : detail ? (
+        <>
+          <ArticleContent
+            item={detail}
+            kind={route.type}
+            kicker={kicker}
+            shared={shared?.part}
+          />
+          <ArticleNav route={route} data={data} />
+        </>
+      ) : error && error.status !== 404 ? (
+        <section className="state-panel" role="alert">
+          <h1>暂时无法读取内容</h1>
+          <p>{error.message}</p>
+          <button type="button" className="button" onClick={onRetry}>
+            重新读取
+          </button>
+        </section>
+      ) : (
+        <section className="state-panel article-not-found">
+          <h1>这篇内容暂时不在这里。</h1>
+          <p>可能尚未发布、已被移除，或链接不完整。可以返回列表看看其他记录。</p>
+          <a className="text-link" href={`/?page=${route.page}`}>
+            {detailLabels[route.type].back}
+          </a>
+        </section>
+      )}
     </div>
   );
 }
-export function Text({ children }) {
-  return (
-    <div className="prose">
-      {String(children || "")
-        .split("\n\n")
-        .map((p, i) => (
-          <p key={i}>{p}</p>
-        ))}
-    </div>
-  );
-}
+
 function App() {
   const [data, setData] = useState(null),
-    [error, setError] = useState(""),
-    [menu, setMenu] = useState(false);
+    [error, setError] = useState("");
   // Completion belongs to this document visit, never to storage or another tab.
   const [visit, setVisit] = useState(() => ({
     url: location.href,
@@ -99,9 +167,6 @@ function App() {
       flushSync(() => {
         setVisit(next);
         setConfirmedVisit(null);
-        setMenu(false);
-        setExploreRequest(null);
-        setExploring(false);
       });
     };
     const restore = (event) => {
@@ -117,82 +182,14 @@ function App() {
       window.removeEventListener("pageshow", restore);
     };
   }, []);
-  const menuToggle = useRef(null);
-  const mobileMenu = useRef(null);
-  const hero = useRef(null);
-  const heroScene = useRef(null);
-  const [exploreRequest, setExploreRequest] = useState(null);
-  const [exploring, setExploring] = useState(false);
-  const [heroVisible, setHeroVisible] = useState(true);
-  const requestExplore = (event) => {
-    setMenu(false);
-    setExploreRequest({ opener: event.currentTarget });
-  };
-  const backdropPointer = useRef(null);
-  const closeMenu = () => {
-    setMenu(false);
-    menuToggle.current?.focus({ preventScroll: true });
-  };
-  useEffect(() => {
-    if (!menu) return;
-    const panel = mobileMenu.current;
-    if (panel) {
-      panel.scrollTop = 0;
-      panel.querySelector("button, a[href]")?.focus({ preventScroll: true });
-    }
-    const closeOnEscape = (event) => {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        closeMenu();
-      }
-      if (event.key === "Tab" && panel) {
-        const items = [
-          ...panel.querySelectorAll("a[href],button:not([disabled])"),
-        ];
-        const at = items.indexOf(document.activeElement);
-        // This drawer is non-modal: leaving either end closes it and returns to
-        // its opener. No focus trap, inert background or document scroll lock.
-        if (
-          (event.shiftKey && at <= 0) ||
-          (!event.shiftKey && at === items.length - 1)
-        ) {
-          event.preventDefault();
-          closeMenu();
-        }
-      }
-    };
-    const desktop = matchMedia("(min-width: 760px)");
-    const closeOnDesktop = (event) => {
-      if (event.matches) setMenu(false);
-    };
-    document.addEventListener("keydown", closeOnEscape);
-    desktop.addEventListener?.("change", closeOnDesktop);
-    return () => {
-      document.removeEventListener("keydown", closeOnEscape);
-      desktop.removeEventListener?.("change", closeOnDesktop);
-    };
-  }, [menu]);
   const query = new URL(visit.url).searchParams;
   const route = resolvePageRoute(query);
+  const [handoff] = useState(() => takeSharedHandoff(route));
   const standaloneEntry = route.type === "survey" && route.standalone;
   const standalone = standaloneEntry && confirmedVisit !== visit;
   const detailKind = route.collection ? route.type : null;
-  const detailPage = route.page;
   const page = route.page;
   const home = page === "home" && route.type === "page";
-  useEffect(() => {
-    if (!home || !hero.current) return;
-    const element = hero.current;
-    const update = () =>
-      setHeroVisible(element.getBoundingClientRect().bottom > 0);
-    update();
-    window.addEventListener("scroll", update, { passive: true });
-    window.addEventListener("resize", update);
-    return () => {
-      window.removeEventListener("scroll", update);
-      window.removeEventListener("resize", update);
-    };
-  }, [home, data]);
   const [detail, setDetail] = useState(null);
   const [detailError, setDetailError] = useState(null);
   const [detailLoading, setDetailLoading] = useState(!!route.collection);
@@ -302,16 +299,36 @@ function App() {
         </Suspense>
       </ModuleBoundary>
     );
-  if (!data && !standaloneEntry)
-    return (
-      <div className="loading">
-        {error || "正在打开个人空间…"}
-        {error && <button onClick={load}>重试</button>}
-      </div>
-    );
   const p = data?.profile || { name: "林珈诚" };
+  const waitingForData = route.type === "page" && !data && !error;
+  const busy = waitingForData || (detailKind && detailLoading);
+  const loadFailure = error && !data && (
+    <section className="page state-panel" role="alert">
+      <h1>暂时无法打开</h1>
+      <p>{error}</p>
+      <button type="button" className="button" onClick={load}>
+        重试
+      </button>
+    </section>
+  );
+  const pageBody = () => {
+    if (loadFailure) return loadFailure;
+    if (!knownPages.includes(page)) return <NotFoundPage />;
+    if (!data)
+      return (
+        <div className="page">
+          {pageHeads[page] && <PageHead {...pageHeads[page]} />}
+          <PageBodySkeleton page={page} />
+        </div>
+      );
+    return page === "us" ? (
+      <Questions data={data} refresh={load} />
+    ) : (
+      <PublicPage page={page} data={data} />
+    );
+  };
   return (
-    <>
+    <ToastProvider>
       <a
         className="skip-main"
         href="#main-content"
@@ -319,140 +336,18 @@ function App() {
       >
         跳到主要内容
       </a>
-      {home && <Intro />}
-      {!standalone && (
-        <ModuleBoundary label="3D 场景" quiet>
-          <Suspense fallback={null}>
-            <Space
-              key={visit.sequence}
-              home={home}
-              sceneTarget={heroScene}
-              openRequest={exploreRequest}
-              onRequestHandled={(request) =>
-                setExploreRequest((current) =>
-                  current === request ? null : current,
-                )
-              }
-              showToggle={
-                !menu && route.type !== "survey" && (!home || !heroVisible)
-              }
-              onOpen={() => setMenu(false)}
-              onActiveChange={setExploring}
-            />
-          </Suspense>
-        </ModuleBoundary>
-      )}
       <div
-        className={`site-content ${page === "home" && !detailKind ? "is-home" : ""} ${standalone ? "standalone-survey" : ""}`}
+        className={`site-content ${home ? "is-home" : ""} ${standalone ? "standalone-survey" : ""}`}
       >
-        {standalone && (
-          <div className="standalone-survey-tools">
-            <ThemeToggle />
-          </div>
-        )}
         {!standalone && (
-          <header className={`header ${menu ? "menu-is-open" : ""}`}>
-            <a className="wordmark" href="/">
-              {p.name}
-              <span>PERSONAL SPACE</span>
-            </a>
-            <button
-              ref={menuToggle}
-              type="button"
-              className="menu-toggle"
-              aria-label={menu ? "关闭导航" : "打开导航"}
-              aria-expanded={menu}
-              aria-controls="mobile-navigation"
-              disabled={exploring}
-              onClick={() => setMenu(!menu)}
-            >
-              {menu ? <X /> : <MenuIcon />}
-            </button>
-            {createPortal(
-              <div className={`mobile-menu-layer ${menu ? "open" : ""}`}>
-                <div
-                  className={`mobile-menu-surface ${menu ? "open" : ""}`}
-                  aria-hidden="true"
-                />
-                <div
-                  className={`menu-backdrop ${menu ? "open" : ""}`}
-                  aria-hidden="true"
-                  onPointerDown={(event) => {
-                    backdropPointer.current = {
-                      clientX: event.clientX,
-                      clientY: event.clientY,
-                    };
-                  }}
-                  onPointerUp={(event) => {
-                    if (dismissFromPointer(backdropPointer.current, event))
-                      closeMenu();
-                    backdropPointer.current = null;
-                  }}
-                  onPointerMove={(event) => {
-                    if (!dismissFromPointer(backdropPointer.current, event))
-                      backdropPointer.current = null;
-                  }}
-                  onPointerCancel={() => {
-                    backdropPointer.current = null;
-                  }}
-                  onClick={(event) => {
-                    if (event.detail === 0) closeMenu();
-                  }}
-                />
-                <nav
-                  ref={mobileMenu}
-                  id="mobile-navigation"
-                  aria-label="手机导航"
-                  inert={!menu ? true : undefined}
-                  aria-hidden={!menu}
-                  className={`mobile-navigation ${menu ? "open" : ""}`}
-                >
-                  <div className="mobile-menu-top">
-                    <ThemeToggle label />
-                    <button
-                      type="button"
-                      className="menu-close"
-                      aria-label="关闭导航"
-                      onClick={closeMenu}
-                    >
-                      <X size={23} />
-                    </button>
-                  </div>
-                  {nav.map(([key, label], index) => (
-                    <a
-                      className={page === key ? "active" : ""}
-                      aria-current={page === key ? "page" : undefined}
-                      key={key}
-                      style={{
-                        "--nav-order": index,
-                        "--nav-reverse-order": nav.length - 1 - index,
-                      }}
-                      href={"/?page=" + key}
-                      onClick={() => setMenu(false)}
-                    >
-                      {label}
-                    </a>
-                  ))}
-                </nav>
-              </div>,
-              document.body,
-            )}
-            <nav aria-label="主要导航" className="desktop-navigation">
-              {nav.map(([key, label]) => (
-                <a
-                  className={page === key ? "active" : ""}
-                  aria-current={page === key ? "page" : undefined}
-                  key={key}
-                  href={"/?page=" + key}
-                >
-                  {label}
-                </a>
-              ))}
-            </nav>
-            <ThemeToggle className="desktop-theme-toggle" />
-          </header>
+          <SiteHeader
+            page={page}
+            name={p.name}
+            dark={home}
+            visitSequence={visit.sequence}
+          />
         )}
-        <main id="main-content" tabIndex={-1}>
+        <main id="main-content" tabIndex={-1} aria-busy={busy ? true : undefined}>
           {route.type === "answer" ? (
             <Answer token={query.get("answer")} />
           ) : route.type === "survey" ? (
@@ -469,423 +364,24 @@ function App() {
               }}
             />
           ) : detailKind ? (
-            <div className="reading article-reading">
-              <a className="back" href={"/?page=" + detailPage}>
-                <ArrowLeft /> 返回{nav.find(([key]) => key === detailPage)?.[1]}
-              </a>
-              {detailLoading ? (
-                <p role="status">正在读取完整内容…</p>
-              ) : detail ? (
-                <ArticleContent item={detail} kind={detailKind} />
-              ) : detailError && detailError.status !== 404 ? (
-                <section role="alert">
-                  <h1>暂时无法读取内容</h1>
-                  <p>{detailError.message}</p>
-                  <button
-                    type="button"
-                    onClick={() => setDetailAttempt((attempt) => attempt + 1)}
-                  >
-                    重新读取
-                  </button>
-                </section>
-              ) : (
-                <section className="article-not-found">
-                  <span className="eyebrow">ARTICLE NOT FOUND</span>
-                  <h1>这篇内容暂时不在这里。</h1>
-                  <p>
-                    可能尚未发布、已被移除，或链接不完整。可以返回列表看看其他记录。
-                  </p>
-                </section>
-              )}
-            </div>
+            <DetailView
+              route={route}
+              data={data}
+              detail={detail}
+              loading={detailLoading}
+              error={detailError}
+              onRetry={() => setDetailAttempt((attempt) => attempt + 1)}
+              handoff={handoff}
+            />
+          ) : home ? (
+            (loadFailure && !data) ? loadFailure : <HomePage data={data} />
           ) : (
-            <>
-              {page === "home" && (
-                <>
-                  <section className="hero universe-hero" ref={hero}>
-                    <div className="hero-copy">
-                      <div className="hero-kicker">
-                        <span className="dot" /> 一个不断生长的个人空间
-                      </div>
-                      <h1>
-                        {p.name}
-                        <span className="name-en">LIN JIACHENG</span>
-                      </h1>
-                      <TypeQuote />
-                    </div>
-                    <div
-                      className="hero-scene"
-                      ref={heroScene}
-                      aria-hidden="true"
-                    />
-                    <div className="hero-actions">
-                      <button
-                        type="button"
-                        className="button hero-explore-button"
-                        aria-haspopup="dialog"
-                        onClick={requestExplore}
-                      >
-                        自由探索 <ArrowRight />
-                      </button>
-                      <a className="hero-secondary" href="#home-next">
-                        慢慢往下看 <ArrowRight />
-                      </a>
-                    </div>
-                    <div className="hero-bottom">
-                      <span>克制 / 好奇 / 浪漫</span>
-                    </div>
-                    <div className="scene-caption" aria-hidden="true">
-                      <span className="scene-caption-line" />
-                      一小片宇宙，
-                      <br />
-                      一些想慢慢了解的事。
-                    </div>
-                  </section>
-                  <section
-                    id="home-next"
-                    className="solar-feature"
-                    aria-labelledby="solar-feature-title"
-                  >
-                    <div className="solar-feature-heading">
-                      <span className="eyebrow">01 / FEATURED EXPLORATION</span>
-                      <span className="solar-feature-type">
-                        交互作品 · 持续探索
-                      </span>
-                    </div>
-                    <div className="solar-feature-content">
-                      <div>
-                        <h2 id="solar-feature-title">
-                          从这里，
-                          <br />
-                          <span>去更远的地方。</span>
-                        </h2>
-                        <p>
-                          太阳系、航天器与我们留下的轨迹。
-                          <br />
-                          一张可以亲自走进去的图谱。
-                        </p>
-                        <a className="text-link" href="/solar/">
-                          进入太阳系 <ArrowUpRight />
-                        </a>
-                      </div>
-                      <a
-                        className="solar-feature-art"
-                        href="/solar/"
-                        aria-label="进入太阳系完整作品"
-                      >
-                        <span className="solar-feature-orbit orbit-a" />
-                        <span className="solar-feature-orbit orbit-b" />
-                        <span className="solar-feature-orbit orbit-c" />
-                        <span className="solar-feature-planet" />
-                        <span className="solar-feature-moon" />
-                        <span className="solar-feature-art-label">
-                          SOLAR SYSTEM ATLAS <ArrowUpRight />
-                        </span>
-                      </a>
-                    </div>
-                  </section>
-                  <section className="home-about" id="explore">
-                    <span className="eyebrow">02 / A LITTLE ABOUT ME</span>
-                    <h2>
-                      一些关于我，
-                      <br />
-                      <span className="muted">和我正在认识的世界。</span>
-                    </h2>
-                    <div className="intro-copy">
-                      <p>{p.intro}</p>
-                      <a className="text-link" href="/?page=about">
-                        再了解一点 <ArrowUpRight />
-                      </a>
-                    </div>
-                  </section>
-                  <section className="directory">
-                    <div className="section-head">
-                      <span className="eyebrow">03 / WANDER AROUND</span>
-                      <p>你可以从任何地方开始。</p>
-                    </div>
-                    {nav.slice(1).map(([key, label], i) => (
-                      <a
-                        className="directory-row"
-                        key={key}
-                        href={"/?page=" + key}
-                      >
-                        <span className="mono">0{i + 1}</span>
-                        <h3>{label}</h3>
-                        <p>
-                          {
-                            [
-                              "留下一些做过的事。",
-                              "把未想明白的事写下来。",
-                              "地点、照片，以及当时的光。",
-                              "一些问题，想听听你的答案。",
-                              "你想说的话，可以留在这里。",
-                            ][i]
-                          }
-                        </p>
-                        <ArrowUpRight />
-                      </a>
-                    ))}
-                  </section>
-                  <section className="home-end">
-                    <span className="eyebrow">STILL EXPLORING</span>
-                    <p>
-                      世界还在展开。
-                      <br />
-                      我也一样。
-                    </p>
-                    <a href="/?page=us">
-                      很高兴，在这里遇见你 <ArrowUpRight />
-                    </a>
-                  </section>
-                </>
-              )}
-              {page === "about" && (
-                <div className="page">
-                  <PageHead
-                    label="ABOUT ME"
-                    title="关于我"
-                    subtitle="比起一个定义，更像一些正在发生的事。"
-                  />
-                  <div className="about-layout">
-                    <div>
-                      {p.portrait ? (
-                        <img
-                          className="portrait"
-                          src={p.portrait}
-                          alt={p.name}
-                        />
-                      ) : (
-                        <div className="portrait-placeholder">
-                          <span>林</span>
-                          <small>照片，等一个合适的时刻。</small>
-                        </div>
-                      )}
-                    </div>
-                    <Text>{p.bio}</Text>
-                  </div>
-                  <Contact p={p} />
-                  <section className="subsection">
-                    <h2>最近在关注</h2>
-                    <div className="interest-grid">
-                      {p.interests.map((x, i) => (
-                        <div key={i}>
-                          <span className="eyebrow">
-                            0{i + 1} / {x.status}
-                          </span>
-                          <h3>{x.title}</h3>
-                          <p>{x.text}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </section>
-                  <section className="subsection">
-                    <h2>一些经历</h2>
-                    {p.timeline.map((x, i) => (
-                      <div className="timeline" key={i}>
-                        <span>{x.date}</span>
-                        <div>
-                          <h3>{x.title}</h3>
-                          <p>{x.text}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </section>
-                </div>
-              )}
-              {page === "projects" && (
-                <div className="page">
-                  <PageHead
-                    label="SELECTED WORK & EXPLORATIONS"
-                    title="作品与项目"
-                    subtitle="做过的事，与正在尝试的可能。"
-                  />
-                  <a className="solar-project-entry" href="/solar/">
-                    <span className="eyebrow">INTERACTIVE EXPLORATION</span>
-                    <h2>
-                      太阳系 · 人类造物图谱 <ArrowUpRight />
-                    </h2>
-                    <p>漫游太阳系，走近航天任务，也从宇宙回到地球。</p>
-                    <span className="text-link">
-                      打开完整作品 <ArrowUpRight />
-                    </span>
-                  </a>
-                  <a className="nine-grid-project-entry" href="/nine-grid/">
-                    <div className="nine-grid-project-copy">
-                      <span className="eyebrow">PHOTO TOOL · 九格</span>
-                      <h2>九格 · 图片生成器 <ArrowUpRight /></h2>
-                      <p>把日常装进九个小格。自由排版、调整裁切，留一点白，再清晰地保存。</p>
-                      <span className="nine-grid-project-details">浏览器本地处理 · 高清 PNG · 批量导出</span>
-                      <span className="text-link">开始制作 <ArrowUpRight /></span>
-                    </div>
-                    <div className="nine-grid-project-art" aria-hidden="true">
-                      {Array.from({ length: 9 }, (_, index) => <span key={index} />)}
-                    </div>
-                  </a>
-                  {data.projects.length ? (
-                    <div className="work-grid">
-                      {data.projects.map((x, i) => (
-                        <a
-                          className="work"
-                          href={"/?page=projects&project=" + x.id}
-                          key={x.id}
-                        >
-                          {x.cover ? (
-                            <img src={x.cover} alt="" />
-                          ) : (
-                            <div className="work-cover">
-                              <span className="mono">0{i + 1}</span>
-                              <span>{x.category}</span>
-                            </div>
-                          )}
-                          <div className="work-meta">
-                            <span className="eyebrow">{x.status}</span>
-                            <ArrowUpRight />
-                          </div>
-                          <h2>{x.title}</h2>
-                          <p>{x.excerpt || "打开查看完整项目"}</p>
-                        </a>
-                      ))}
-                    </div>
-                  ) : (
-                    <Empty
-                      title="作品正在整理。"
-                      text="等照片、报告与过程准备好，再把完整的故事留在这里。"
-                    />
-                  )}
-                </div>
-              )}
-              {page === "notes" && (
-                <div className="page">
-                  <PageHead
-                    label="NOTES & THOUGHTS"
-                    title="随笔"
-                    subtitle="有些问题，可以暂时没有答案。"
-                  />
-                  {data.posts.length ? (
-                    data.posts.map((x) => (
-                      <a
-                        className="note-row"
-                        href={"/?page=notes&post=" + x.id}
-                        key={x.id}
-                      >
-                        <span className="mono">
-                          {date(contentDateValue(x, "posts"))}
-                        </span>
-                        <div>
-                          <h2>{x.title}</h2>
-                          <p>{x.excerpt || "打开阅读全文"}</p>
-                        </div>
-                        <ArrowUpRight />
-                      </a>
-                    ))
-                  ) : (
-                    <Empty
-                      title="第一篇，还在路上。"
-                      text="关于学习、生活，以及那些值得多想一会儿的事。"
-                    />
-                  )}
-                </div>
-              )}
-              {page === "world" && (
-                <div className="page wide">
-                  <PageHead
-                    label="PLACES, MOMENTS & LIGHT"
-                    title="关于世界"
-                    subtitle="用问题靠近世界，用照片留住片刻。"
-                  />
-                  <ModuleBoundary label="世界地图">
-                    <Suspense
-                      fallback={<div className="loading">正在展开地球…</div>}
-                    >
-                      <World stories={data.stories} />
-                    </Suspense>
-                  </ModuleBoundary>
-                </div>
-              )}
-              {page === "you" && (
-                <div className="page">
-                  <PageHead
-                    label="I WONDER ABOUT YOU"
-                    title="关于你"
-                    subtitle="这次，想听听你的答案。"
-                  />
-                  {data.surveys.length ? (
-                    data.surveys.map((s) => (
-                      <a
-                        className="survey-card"
-                        key={s.id}
-                        href={"/?page=you&survey=" + s.id}
-                      >
-                        <span className="eyebrow">
-                          {s.closed
-                            ? "已关闭"
-                            : s.startsAt && Date.now() < Date.parse(s.startsAt)
-                              ? "尚未开始"
-                              : s.endsAt && Date.now() > Date.parse(s.endsAt)
-                                ? "已结束"
-                                : "开放填写"}{" "}
-                          · {s.questionCount} 个问题
-                        </span>
-                        <h2>{s.title}</h2>
-                        <p>{s.description}</p>
-                        <span className="text-link">
-                          打开问卷 <ArrowRight />
-                        </span>
-                      </a>
-                    ))
-                  ) : (
-                    <Empty
-                      title="新的问题，正在酝酿。"
-                      text="这里会发布问卷，聊聊生活、选择，或值得研究的问题。"
-                    />
-                  )}
-                </div>
-              )}
-              {page === "us" && <Questions data={data} refresh={load} />}
-              {![
-                "home",
-                "about",
-                "projects",
-                "notes",
-                "world",
-                "you",
-                "us",
-              ].includes(page) && <Empty title="这一页还不存在。" />}
-            </>
+            pageBody()
           )}
         </main>
-        {!standalone && (
-          <footer>
-            <a href="/">林珈诚 · 个人空间</a>
-            <span>慢慢认识世界，也慢慢认识自己。</span>
-            <a href="/?page=admin">
-              管理 <ArrowUpRight />
-            </a>
-            <small>© {new Date().getFullYear()} LIN JIACHENG</small>
-          </footer>
-        )}
+        {!standalone && <SiteFooter home={home} />}
       </div>
-    </>
-  );
-}
-export function PageHead({ label, title, subtitle }) {
-  return (
-    <div className="page-head">
-      <span className="eyebrow">{label}</span>
-      <h1>
-        {title}
-        <span className="tiny-dot">.</span>
-      </h1>
-      <p>{subtitle}</p>
-    </div>
-  );
-}
-function Contact({ p }) {
-  return (
-    <div className="contact" id="profile">
-      <span className="eyebrow">PROFILE / 个人资料</span>
-      <ProfileFields profile={p} />
-    </div>
+    </ToastProvider>
   );
 }
 export function Questions({ data, refresh }) {
@@ -904,6 +400,7 @@ export function Questions({ data, refresh }) {
     [uncertain, setUncertain] = useState(false);
   const attempt = useRef(null);
   const inflight = useRef(false);
+  const toast = useToast();
   const set = (k, v) => setB((previous) => ({ ...previous, [k]: v }));
   async function submit(e) {
     e.preventDefault();
@@ -917,9 +414,11 @@ export function Questions({ data, refresh }) {
         await api("/questions", { method: "POST", body: attempt.current }),
       );
       setUncertain(false);
+      toast.success("留言已收到");
       refresh();
     } catch (e) {
       setError(e.message);
+      toast.error(e.message);
       const unknown =
         !e.status || e.status >= 500 || e.status === 429 || e.status === 408;
       setUncertain(unknown);
@@ -935,18 +434,18 @@ export function Questions({ data, refresh }) {
     try {
       const r = await api("/recover", { method: "POST", body: { key } });
       if (r.link) location.href = r.link;
-      else setFound(r.message);
+      else {
+        setFound(r.message);
+        toast.success(r.message);
+      }
     } catch (e) {
       setFound(e.message);
+      toast.error(e.message);
     }
   }
   return (
     <div className="page">
-      <PageHead
-        label="A CONVERSATION BETWEEN US"
-        title="关于我们"
-        subtitle="一个问题，一句问候，或者一段还没说出口的话。"
-      />
+      <PageHead {...pageHeads.us} />
       <div className="conversation-layout">
         <section>
           {result ? (
@@ -1093,14 +592,18 @@ export function Questions({ data, refresh }) {
               {found && <p role="status">{found}</p>}
             </form>
           </details>
+          <p className="page-aside">
+            <a className="text-link" href="/?page=you">
+              看看开放中的问卷
+            </a>
+          </p>
         </section>
         <aside>
-          <span className="eyebrow">WORDS LEFT HERE</span>
-          <h2>我们之间的对话</h2>
+          <BlockTitle zh="我们之间的对话" en="Words left here" />
           {data.messages.length ? (
             data.messages.map((m) => <Message key={m.id} m={m} report />)
           ) : (
-            <Empty title="这里还很安静。" text="你可以留下第一句话。" />
+            <Pending />
           )}
         </aside>
       </div>
@@ -1109,16 +612,17 @@ export function Questions({ data, refresh }) {
 }
 function Message({ m, report = false }) {
   const [reported, setReported] = useState(false);
+  const toast = useToast();
   return (
     <article className="message">
       <div className="message-meta">
         <span>{m.name || "匿名"}</span>
-        <time>{date(m.createdAt)}</time>
+        <time className="meta">{dotDate(m.createdAt)}</time>
       </div>
       <p className="question-text">{m.question}</p>
       {m.reply ? (
         <div className="reply">
-          <span className="eyebrow">林珈诚的回复</span>
+          <span className="meta">林珈诚的回复</span>
           <p>{m.reply}</p>
         </div>
       ) : (
@@ -1135,8 +639,9 @@ function Message({ m, report = false }) {
                 body: { reason: "访客举报" },
               });
               setReported(true);
+              toast.success("举报已提交");
             } catch (e) {
-              alert(e.message);
+              toast.error(e.message);
             }
           }}
         >
@@ -1155,16 +660,18 @@ function Answer({ token }) {
       .catch((e) => setError(e.message));
   }, [token]);
   return (
-    <div className="reading">
-      <a className="back" href="/?page=us">
-        <ArrowLeft /> 关于我们
-      </a>
+    <div className="page">
       <PageHead
-        label="JUST BETWEEN US"
         title="你的提问"
+        en="Just between us"
         subtitle="这个链接属于这一次对话。请妥善保存。"
       />
       {m ? <Message m={m} /> : <p>{error || "正在读取…"}</p>}
+      <p className="page-aside">
+        <a className="text-link" href="/?page=us">
+          回到关于我们
+        </a>
+      </p>
     </div>
   );
 }
