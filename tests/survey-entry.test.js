@@ -212,7 +212,7 @@ test("the very first independent render and loading form contain no mounted site
     container.querySelector("form"),
     "the form must not wait for unrelated public data",
   );
-  assert.ok(container.querySelector(".theme-toggle"));
+  assert.equal(container.querySelector(".theme-toggle"), null);
   await act(async () => summary.resolve(reply({ error: "首页不可用" }, 500)));
   noSiteChrome();
   assert.match(container.textContent, /必要的填写说明/);

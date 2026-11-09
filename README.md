@@ -1,6 +1,6 @@
 # 个人宇宙空间
 
-可交互 3D 首页、自由探索模式、个人内容和完整太阳系图谱。
+杂志式排版的个人主页、作品与随笔、照片故事、问卷留言，以及完整太阳系图谱。
 
 ## 启动
 
@@ -22,8 +22,8 @@ Node 自动启动仅监听本机随机端口的 Atlas Python 子服务，无需�
 
 ## 体验
 
-- 首页真实 Three.js 场景与滚动镜头过渡；「自由探索」可旋转、缩放及选择六个栏目，退出返回之前的阅读位置。
-- 首页太阳系作品入口在同一标签页打开 `/solar/`，顶部可返回个人主页。
+- 首页为静态排版与通栏照片，不加载 Three.js；Three.js 只在太阳系和「关于世界」的地球里使用。
+- 作品区的太阳系入口在同一标签页打开 `/solar/`，顶部可返回个人主页。
 - 「作品与项目」中的「九格」打开本站 `/nine-grid/` 图片工具。只在作品列表提供入口，不增加首页、主导航或主题区域按钮；照片在浏览器本地编辑和导出。
 - 保留关于我、作品与项目、随笔、线条地球照片、问卷、公开/私密留言与管理员后台。
 - 保留太阳系轨道目录、地球、海洋、天气自动更新和离线回退。来源的发布频率及快照限制见 `atlas/README.md`。
@@ -80,6 +80,6 @@ v1.0.1 发布前验证：Node 99 项、Python 60 项、彗星轨道 20 项通过
 ## 来源与许可
 
 Atlas 来自 https://solar-system-atlas.pages.dev/solar/ 的本地化及后续扩展，详情见 `atlas/README.md`、`atlas/crawl-report.json`。
-Noto Sans SC：SIL Open Font License 1.1，见 `public/fonts/OFL-NotoSansSC.txt`。
+Noto Sans SC：SIL Open Font License 1.1，见 `public/fonts/OFL-NotoSansSC.txt`。Noto Serif SC 与 Instrument Serif：SIL Open Font License 1.1，见各自字体目录的 `OFL.txt`，用 `node scripts/build-fonts.mjs` 重新生成。
 MediaPipe Tasks Vision 和 Hand Landmarker 模型：Apache-2.0，见 `atlas/solar/vendor/gesture/PROVENANCE.md` 与随附许可。
 第三方捕获内容、音频及素材仍受各自许可约束；本仓库没有将所有素材统一声明为原创或重新授权。

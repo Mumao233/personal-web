@@ -60,6 +60,7 @@ import {
 } from "./content.js";
 import { saveContentDraft, transitionContent } from "./admin-content.js";
 import { publicSummary } from "./public-content.js";
+import { applyFontCache } from "./static-cache.js";
 import { buildPublicPageMetadata, injectPageMetadata } from "./page-metadata.js";
 import { validateContentMedia } from "./media-processing.js";
 import { reverseLocationCandidate } from "./location-result.js";
@@ -106,7 +107,13 @@ app.use((req, res, next) => {
 });
 // Public personal assets win only when a real public file exists. Never serve
 // the private database directory; /data belongs exclusively to the Atlas.
-app.use(express.static(resolve("public"), { index: false, dotfiles: "deny" }));
+app.use(
+  express.static(resolve("public"), {
+    index: false,
+    dotfiles: "deny",
+    setHeaders: applyFontCache,
+  }),
+);
 if (atlas) app.use(atlas.middleware);
 app.use(express.json({ limit: "2mb" }));
 app.use("/api", (req, res, next) => {

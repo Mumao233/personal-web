@@ -1,0 +1,100 @@
+/* The design system for public pages. Admin keeps theme-tokens.css. */
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/assets/JetBrainsMono-Regular.woff2") format("woff2");
+}
+
+:root {
+  /* Paper surfaces */
+  --color-paper: #f0ede7;
+  --color-ink: #17181a;
+  --color-body: #3a3b3e;
+  --color-article: #26272a;
+  --color-muted: #5a5b5f;
+  --color-line: #cbc6bd;
+  --color-accent: #3d4b5c;
+
+  /* Dark surfaces: work section, footer, drawers, the photo viewer */
+  --color-dark-bg: #16171a;
+  --color-dark-ink: #ece9e3;
+  --color-dark-body: #c9c6c0;
+  --color-dark-muted: #a3a19c;
+  --color-dark-line: #2e2f33;
+  --color-dark-panel: #24262b;
+  --color-dark-void: #0d0e10;
+
+  /* First screen only. --color-hero-kicker is the one warm color on the site. */
+  --color-hero-sky: #2a2c30;
+  --color-hero-city: #111317;
+  --color-hero-title: #f2efea;
+  --color-hero-subtitle: #b9b6b0;
+  --color-hero-intro: #d6d3cd;
+  --color-hero-kicker: #e39a62;
+
+  /* Type families, each with its system fallback */
+  --font-serif-zh: "Noto Serif SC", "Songti SC", "STSong", "SimSun", serif;
+  --font-sans-zh: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --font-serif-en: "Instrument Serif", "Songti SC", "STSong", "SimSun", serif;
+  --font-mono: "JetBrains Mono", "Noto Sans SC", "PingFang SC",
+    "Microsoft YaHei", monospace;
+
+  /* Type scale */
+  --text-hero: clamp(48px, 7vw, 108px);
+  --text-hero-sub: clamp(22px, 2.2vw, 32px);
+  --text-section: clamp(40px, 5vw, 72px);
+  --text-section-en: clamp(24px, 2.4vw, 34px);
+  --text-feature: clamp(32px, 3.4vw, 48px);
+  --text-article-title: clamp(40px, 5.6vw, 80px);
+  --text-pull-quote: clamp(28px, 3.2vw, 44px);
+  --text-quote: clamp(26px, 2.6vw, 36px);
+  --text-block: 22px;
+  --text-item-lg: 30px;
+  --text-item: 28px;
+  --text-item-sm: 24px;
+  --text-lead: 24px;
+  --text-article: 19px;
+  --text-body-lg: 17px;
+  --text-body: 16px;
+  --text-small: 15px;
+  --text-nav: 14px;
+  --text-meta: 12px;
+  --leading-hero: 1.12;
+  --leading-section: 1.1;
+  --leading-body: 1.95;
+  --leading-body-lg: 2;
+  --leading-article: 2.05;
+  --tracking-meta: 0.06em;
+  --tracking-kicker: 0.08em;
+
+  /* Layout */
+  --layout-max: 1360px;
+  --layout-reading: 720px;
+  --layout-gutter: clamp(20px, 4.5vw, 64px);
+  --section-gap: clamp(96px, 11vw, 160px);
+  --tap-min: 44px;
+  --radius-pill: 999px;
+
+  /* Motion */
+  --motion-fast: 180ms;
+  --motion-base: 240ms;
+  --motion-slow: 320ms;
+  --ease: ease-out;
+}
+
+/* The globe reads these two names at runtime to paint itself. */
+html[data-surface="public"] {
+  --tone-surface-080a0b: #16171a;
+  --tone-ink-8dabb8: #a3a19c;
+  color-scheme: light !important;
+}
+
+/* Admin styles arrive with its lazy chunk; avoid a white flash until then. */
+html[data-surface="admin"][data-theme="dark"] {
+  background: #050505;
+}
+html[data-surface="admin"][data-theme="light"] {
+  background: #f6f2e9;
+}

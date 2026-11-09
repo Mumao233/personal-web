@@ -1,8 +1,9 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { X, ArrowLeft, ArrowRight } from "@phosphor-icons/react";
 import { formatContentDate } from "../shared/content-date.js";
-import "./media-viewer.css";
+
+const FLIP_MS = 280;
 
 export function imageKey(src) {
   try {
@@ -16,7 +17,7 @@ export function safeMediaUrl(value) {
   if (
     typeof value !== "string" ||
     !value ||
-    /[\\\u0000-\u0020\u007f]/.test(value)
+    /[\\\u0000- \u007f]/.test(value)
   )
     return "";
   if (/^\/(?!\/)/.test(value)) return value;
@@ -58,17 +59,92 @@ export function articlePhotos(item) {
   return [...images.values()];
 }
 
-export default function MediaViewer({ images, start = 0, onClose }) {
+const motionAllowed = (node) =>
+  typeof node?.animate === "function" &&
+  !globalThis.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+
+function pageImage(src, dialog) {
+  const key = imageKey(src);
+  return [...document.querySelectorAll("img")].find(
+    (image) =>
+      !dialog?.contains(image) &&
+      imageKey(image.getAttribute("src")) === key &&
+      image.getBoundingClientRect().width > 0,
+  );
+}
+
+// Where `to` has to start so that it visually sits on top of `from`.
+function flipTransform(from, to) {
+  const scale = Math.max(from.width / to.width, from.height / to.height);
+  const x = from.left + from.width / 2 - (to.left + to.width / 2);
+  const y = from.top + from.height / 2 - (to.top + to.height / 2);
+  return `translate(${x}px, ${y}px) scale(${scale})`;
+}
+
+export default function MediaViewer({ images, start = 0, onClose, place = "" }) {
   const [index, setIndex] = useState(start);
   const [failed, setFailed] = useState(false);
+  const [closing, setClosing] = useState(false);
+  const [entering, setEntering] = useState(() =>
+    motionAllowed(globalThis.document?.documentElement),
+  );
   const dialog = useRef(null),
     close = useRef(null),
+    stage = useRef(null),
     onCloseRef = useRef(onClose),
+    closingRef = useRef(false),
+    openedRef = useRef(false),
+    currentRef = useRef(null),
     touch = useRef(null);
   onCloseRef.current = onClose;
   const current = images[index];
+  currentRef.current = current;
   const move = (step) =>
     setIndex((value) => (value + step + images.length) % images.length);
+  const requestClose = useCallback(() => {
+    if (closingRef.current) return;
+    const image = stage.current;
+    const source =
+      currentRef.current && pageImage(currentRef.current.src, dialog.current);
+    const target = source?.getBoundingClientRect();
+    const visible =
+      target && target.bottom > 0 && target.top < globalThis.innerHeight;
+    if (!image?.isConnected || !visible || !motionAllowed(image)) {
+      onCloseRef.current();
+      return;
+    }
+    closingRef.current = true;
+    setClosing(true);
+    image
+      .animate(
+        [
+          { transform: "none" },
+          { transform: flipTransform(target, image.getBoundingClientRect()) },
+        ],
+        { duration: FLIP_MS, easing: "ease-out", fill: "forwards" },
+      )
+      .finished.catch(() => {})
+      .finally(() => onCloseRef.current());
+  }, []);
+  const openFromSource = (image) => {
+    if (openedRef.current) return;
+    openedRef.current = true;
+    setEntering(false);
+    const source = pageImage(image.getAttribute("src"), dialog.current);
+    if (!source || !motionAllowed(image)) return;
+    image.animate(
+      [
+        {
+          transform: flipTransform(
+            source.getBoundingClientRect(),
+            image.getBoundingClientRect(),
+          ),
+        },
+        { transform: "none" },
+      ],
+      { duration: FLIP_MS, easing: "ease-out" },
+    );
+  };
   useEffect(() => setFailed(false), [index]);
   useEffect(() => {
     const previous = document.activeElement;
@@ -83,7 +159,7 @@ export default function MediaViewer({ images, start = 0, onClose }) {
     const keydown = (event) => {
       if (event.key === "Escape") {
         event.preventDefault();
-        onCloseRef.current();
+        requestClose();
       } else if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
         event.preventDefault();
         move(event.key === "ArrowLeft" ? -1 : 1);
@@ -129,9 +205,10 @@ export default function MediaViewer({ images, start = 0, onClose }) {
   }, []);
   if (!current) return null;
   const first = Math.max(0, Math.min(index - 3, images.length - 7));
+  const taken = formatContentDate(current.takenAt);
   return createPortal(
     <div
-      className="media-viewer"
+      className={`media-viewer${closing ? " is-closing" : ""}${entering ? " is-entering" : ""}`}
       role="dialog"
       aria-modal="true"
       aria-label="照片查看器"
@@ -144,7 +221,7 @@ export default function MediaViewer({ images, start = 0, onClose }) {
         <button
           type="button"
           ref={close}
-          onClick={onClose}
+          onClick={requestClose}
           aria-label="关闭照片查看器"
         >
           <X /> <span>关闭</span>
@@ -181,9 +258,14 @@ export default function MediaViewer({ images, start = 0, onClose }) {
         ) : (
           <img
             key={current.src}
+            ref={stage}
             src={current.src}
             alt={current.alt}
-            onError={() => setFailed(true)}
+            onLoad={(event) => openFromSource(event.currentTarget)}
+            onError={() => {
+              setEntering(false);
+              setFailed(true);
+            }}
           />
         )}
         <button
@@ -197,12 +279,9 @@ export default function MediaViewer({ images, start = 0, onClose }) {
         </button>
       </div>
       <div className="viewer-caption" aria-live="polite">
+        {place && <span className="viewer-place">{place}</span>}
+        {taken && <time dateTime={current.takenAt}>{taken}</time>}
         {current.caption && <p>{current.caption}</p>}
-        {formatContentDate(current.takenAt) && (
-          <time dateTime={current.takenAt}>
-            {formatContentDate(current.takenAt)}
-          </time>
-        )}
       </div>
       <div className="viewer-thumbnails" aria-label="选择照片">
         {images.slice(first, first + 7).map((image, offset) => (

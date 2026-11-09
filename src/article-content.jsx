@@ -7,7 +7,8 @@ import MediaViewer, {
   imageKey,
   ProjectAttachments,
 } from "./media-viewer.jsx";
-import "./article-content.css";
+import { dotDate, withoutPlaceholder } from "./public-format.js";
+import { sharedStyle } from "./view-transition.js";
 
 function safeUrl(value, image = false) {
   if (typeof value !== "string") return "";
@@ -160,7 +161,13 @@ export function RichBody({ content, body = "", onImage, photoDetails }) {
   );
 }
 
-export default function ArticleContent({ item, preview = false, kind }) {
+export default function ArticleContent({
+  item,
+  preview = false,
+  kind,
+  kicker = null,
+  shared = null,
+}) {
   const [viewing, setViewing] = useState(null);
   if (!item) return null;
   const images = articlePhotos(item);
@@ -187,11 +194,15 @@ export default function ArticleContent({ item, preview = false, kind }) {
     item,
     kind || (Array.isArray(item.photos) ? "stories" : "posts"),
   );
-  const publishedDate = date(dateValue);
+  const publishedDate = preview ? date(dateValue) : dotDate(dateValue);
   const place = item.location || item.city;
   return (
-    <article className={`article-content${preview ? " article-preview" : ""}`}>
+    <article
+      className={`article-content${preview ? " article-preview" : ""}`}
+      data-kind={kind || undefined}
+    >
       <header className="article-heading">
+        {kicker}
         {(item.category || place || publishedDate) && (
           <div className="article-meta">
             {item.category && <span>{item.category}</span>}
@@ -199,8 +210,15 @@ export default function ArticleContent({ item, preview = false, kind }) {
             {publishedDate && <time dateTime={dateValue}>{publishedDate}</time>}
           </div>
         )}
-        <h1>{item.title || "未命名文章"}</h1>
-        {item.excerpt && <p className="article-excerpt">{item.excerpt}</p>}
+        <h1
+          className={shared === "title" ? "vt-shared-target" : undefined}
+          style={sharedStyle(shared, "title")}
+        >
+          {item.title || "未命名文章"}
+        </h1>
+        {(preview ? item.excerpt : withoutPlaceholder(item.excerpt)) && (
+          <p className="article-excerpt">{item.excerpt}</p>
+        )}
       </header>
       {showCover && (
         <button
@@ -210,7 +228,8 @@ export default function ArticleContent({ item, preview = false, kind }) {
           aria-label={`查看封面：${item.title || "文章封面"}`}
         >
           <img
-            className="article-cover"
+            className={`article-cover${shared === "media" ? " vt-shared-target" : ""}`}
+            style={sharedStyle(shared, "media")}
             src={cover}
             alt={
               images.find((image) => imageKey(image.src) === imageKey(cover))
@@ -240,6 +259,12 @@ export default function ArticleContent({ item, preview = false, kind }) {
                   aria-label={`查看照片 ${i + 1}`}
                 >
                   <img
+                    className={
+                      shared === "media" && !showCover && i === 0
+                        ? "vt-shared-target"
+                        : undefined
+                    }
+                    style={!showCover && i === 0 ? sharedStyle(shared, "media") : undefined}
                     src={photo}
                     alt={
                       images.find(
@@ -273,6 +298,7 @@ export default function ArticleContent({ item, preview = false, kind }) {
         <MediaViewer
           images={images}
           start={viewing}
+          place={place}
           onClose={() => setViewing(null)}
         />
       )}
