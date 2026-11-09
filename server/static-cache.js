@@ -1,4 +1,4 @@
-const FONT_FILE = /[\/]fonts[\/].+\.woff2$/i;
+const FONT_FILE = /[\\/]fonts[\\/].+\.woff2$/i;
 
 // Font slice names change with their content. The @font-face CSS keeps a stable
 // name and must keep revalidating, so only the woff2 files are immutable.
