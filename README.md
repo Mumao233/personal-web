@@ -72,7 +72,7 @@ v1.0.1 发布前验证：Node 99 项、Python 60 项、彗星轨道 20 项通过
 
 线上网站：https://mumao.site/ · [阿里云部署记录](deploy/README.md)
 
-当前版本：**v1.4.0**。九格图片生成器集成为本站功能页面，从「作品与项目」进入；界面继承现有主题，支持多图排版、裁切、撤销和高清批量导出。版本变化见 [更新日志](CHANGELOG.md)，本版说明见 [九格集成](docs/v1.4.0-nine-grid.md)，助手入口见 [调用说明](docs/assistant-admin.md)，发布约定见 [版本发布流程](docs/releases.md)。实际发布状态以服务器发布清单和同名 GitHub Release 为准。
+当前版本：**v2.0.0**。公开页面按 v2 设计稿重做，采用新的导航、杂志式排版、自托管字体与首屏照片；移除旧星球首页、欢迎动画、换句、自由探索及公开主题切换。太阳系、九格和后台继续保留，接口与数据结构不变。版本变化见 [更新日志](CHANGELOG.md)，改版与验证边界见 [v2 改版说明](docs/design-v2/PR-description.md)，助手入口见 [调用说明](docs/assistant-admin.md)，发布约定见 [版本发布流程](docs/releases.md)。实际发布状态以服务器发布清单和同名 GitHub Release 为准。
 
 此仓库保存整合网站的完整源码。克隆后按“启动”一节安装依赖并运行；本地私有数据库、上传文件、运行缓存和构建产物不包含在仓库中。
 完整站包含 Node/SQLite 与 Python 服务，不能仅把静态 HTML 上传 GitHub Pages。正式上线需支持这两个服务的主机、HTTPS 及持久数据目录。
