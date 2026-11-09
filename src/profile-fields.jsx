@@ -7,7 +7,6 @@ import {
   Trash,
 } from "@phosphor-icons/react";
 import { getProfileFields, profileFieldHref } from "../server/profile.js";
-import "./profile-fields.css";
 
 export function ProfileFieldsEditor({ profile, onChange }) {
   const fields = getProfileFields(profile);
@@ -177,9 +176,12 @@ export function ProfileFieldsEditor({ profile, onChange }) {
   );
 }
 
-export function ProfileFields({ profile }) {
+export function ProfileFields({ profile, hideField }) {
   const fields = getProfileFields(profile).filter(
-    (field) => field.visible !== false && String(field.value).trim(),
+    (field) =>
+      field.visible !== false &&
+      String(field.value).trim() &&
+      !hideField?.(field),
   );
   if (!fields.length)
     return <p className="fine">可以在「关于我们」里给我留言。</p>;
