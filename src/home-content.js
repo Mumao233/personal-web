@@ -16,6 +16,9 @@ export const hero = {
   },
 };
 
+export const intro =
+  "我是林珈诚，在暨南大学读金融。想成为一个真正看得懂技术的研究者，所以读财报，也写代码；空下来的时候，拿着 iPhone 去拍暮色。";
+
 export const threads = [
   {
     numeral: "I",

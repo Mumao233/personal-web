@@ -411,10 +411,7 @@ export default function World({ stories = [], onPick, pick, compact = false }) {
               </a>
             ))
           ) : (
-            <div className="empty">
-              <h3>还没有放下第一个锚点。</h3>
-              <p>等照片选好，把真正去过的地方留在这里。</p>
-            </div>
+            <p className="pending">筹备中</p>
           )}
         </div>
       )}

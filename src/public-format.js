@@ -31,6 +31,7 @@ export const storyImage = (story) => story.cover || story.photos?.[0] || "";
 export function worksFrom(projects = []) {
   const [first, ...rest] = projects.map((project) => ({
     ...project,
+    excerpt: withoutPlaceholder(project.excerpt),
     href: `/?page=projects&project=${encodeURIComponent(project.id)}`,
     meta: [
       dotDate(contentDateValue(project, "projects")),

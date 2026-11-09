@@ -97,11 +97,6 @@ html[data-surface="public"] {
     color: var(--color-hero-intro);
     text-wrap: pretty;
   }
-  & div.intro-copy-text {
-    display: flex;
-    flex-direction: column;
-    gap: 14px;
-  }
   & .hero-actions {
     display: flex;
     flex-wrap: wrap;

@@ -7,7 +7,7 @@ import MediaViewer, {
   imageKey,
   ProjectAttachments,
 } from "./media-viewer.jsx";
-import { dotDate } from "./public-format.js";
+import { dotDate, withoutPlaceholder } from "./public-format.js";
 import { sharedStyle } from "./view-transition.js";
 
 function safeUrl(value, image = false) {
@@ -216,7 +216,9 @@ export default function ArticleContent({
         >
           {item.title || "未命名文章"}
         </h1>
-        {item.excerpt && <p className="article-excerpt">{item.excerpt}</p>}
+        {(preview ? item.excerpt : withoutPlaceholder(item.excerpt)) && (
+          <p className="article-excerpt">{item.excerpt}</p>
+        )}
       </header>
       {showCover && (
         <button

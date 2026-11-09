@@ -2,7 +2,7 @@ import React from "react";
 import { ArrowRight } from "@phosphor-icons/react";
 import { contentDateValue } from "../shared/content-date.js";
 import { surveyVisitUrl } from "../shared/page-info.js";
-import { hero, notesQuote, threads } from "./home-content.js";
+import { hero, intro, notesQuote, threads } from "./home-content.js";
 import {
   byNewest,
   dotDate,
@@ -11,7 +11,6 @@ import {
   worksFrom,
 } from "./public-format.js";
 import {
-  IntroSkeleton,
   NotesSkeleton,
   RowsSkeleton,
   WorkSkeleton,
@@ -264,11 +263,7 @@ export default function HomePage({ data }) {
         <HeroPhoto />
         <section className="hero-intro" aria-label="自我介绍">
           <div className="hero-intro-inner">
-            {data ? (
-              <p className="intro-copy-text">{data.profile.intro}</p>
-            ) : (
-              <IntroSkeleton />
-            )}
+            <p className="intro-copy-text">{intro}</p>
             <div className="hero-actions">
               <a className="button is-light" href="#work">
                 看看作品 <ArrowRight aria-hidden="true" />

@@ -128,6 +128,10 @@ test("the homepage keeps its hero on first paint and marks data sections busy", 
   assert.equal(main.getAttribute("aria-busy"), "true");
   assert.equal(document.querySelector("h1").textContent, "在技术与价值之间。");
   assert.ok(document.querySelector("#work .skeleton"));
+  assert.match(
+    document.querySelector(".hero-intro p").textContent,
+    /^我是林珈诚，在暨南大学读金融。/,
+  );
   const photo = document.querySelector(".hero-photo img");
   assert.notEqual(photo.getAttribute("loading"), "lazy");
   assert.equal(photo.getAttribute("fetchpriority"), "high");
@@ -136,10 +140,6 @@ test("the homepage keeps its hero on first paint and marks data sections busy", 
   await act(async () => release());
   assert.equal(main.hasAttribute("aria-busy"), false);
   assert.equal(document.querySelector("#work .skeleton"), null);
-  assert.equal(
-    document.querySelector(".hero-intro p").textContent,
-    "保留的简介",
-  );
 });
 
 test("the homepage has no 3D scene, explorer, greeting or admin link", async () => {
@@ -165,7 +165,13 @@ test("work follows the design order without inventing projects", async () => {
     sample({
       projects: [
         { id: "a", title: "项目甲", category: "研究", excerpt: "摘要" },
-        { id: "b", title: "项目乙", category: "工具", cover: "/uploads/b.jpg" },
+        {
+          id: "b",
+          title: "项目乙",
+          category: "工具",
+          cover: "/uploads/b.jpg",
+          excerpt: "年份待补充",
+        },
       ],
     }),
   );
@@ -175,6 +181,7 @@ test("work follows the design order without inventing projects", async () => {
     "太阳系 · 人类造物图谱",
   ]);
   assert.deepEqual(titles(".work-row-title"), ["九格 · 图片生成器", "项目乙"]);
+  assert.doesNotMatch(text(), /待补充/);
   assert.ok(document.querySelector('.work-feature[href="/solar/"]'));
   assert.ok(document.querySelector('.work-row[href="/nine-grid/"]'));
   await act(async () => root.unmount());

@@ -8,14 +8,6 @@ export const SkeletonLine = ({ width = "100%", height = 16, className = "" }) =>
   />
 );
 
-export const IntroSkeleton = () => (
-  <div className="intro-copy-text">
-    <SkeletonLine className="on-dark" />
-    <SkeletonLine className="on-dark" />
-    <SkeletonLine className="on-dark" width="62%" />
-  </div>
-);
-
 export function RowsSkeleton({ rows = 3, dark = false }) {
   return (
     <div className="skeleton-rows">
