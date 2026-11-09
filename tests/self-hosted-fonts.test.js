@@ -15,7 +15,7 @@ const families = ["noto-serif-sc", "instrument-serif"];
 test("only woff2 files under /fonts/ are cached for a year", () => {
   const immutable = "public, max-age=31536000, immutable";
   assert.equal(fontCacheControl("/app/public/fonts/a/x.1.woff2"), immutable);
-  assert.equal(fontCacheControl("D:\site\public\fonts\a\x.woff2"), immutable);
+  assert.equal(fontCacheControl(String.raw`D:\site\public\fonts\a\x.woff2`), immutable);
   assert.equal(fontCacheControl("/app/public/fonts/noto-serif-sc.css"), "");
   assert.equal(fontCacheControl("/app/public/assets/Mono.woff2"), "");
   assert.equal(fontCacheControl("/app/public/images/hero.avif"), "");
