@@ -21,7 +21,8 @@ import {
   exclusiveOptionsFor,
   surveyAnswerProgress,
 } from "../server/validation.js";
-import "./survey-advanced.css";
+import { useToast } from "./toast.jsx";
+import { SkeletonLine } from "./skeleton.jsx";
 
 export function surveySections(questions) {
   const groups = [];
@@ -426,6 +427,7 @@ export default function Survey({
   const definitionGeneration = useRef(0);
   const sectionHeading = useRef(null);
   const sectionFocus = useRef(false);
+  const toast = useToast();
 
   useEffect(() => {
     if (!sectionFocus.current) return;
@@ -1047,7 +1049,7 @@ export default function Survey({
   );
   if (!survey)
     return (
-      <div className="page survey-state">
+      <div className="page survey-state" aria-busy={error ? undefined : true}>
         {!standalone && (
           <a className="back" href="/?page=you">
             <ArrowLeft /> 返回问卷
@@ -1055,7 +1057,16 @@ export default function Survey({
         )}
         <section role={error ? "alert" : "status"}>
           {error && <h1>问卷暂时无法填写</h1>}
-          <p>{error || "正在打开问卷…"}</p>
+          <p className={error ? undefined : "sr-only"}>
+            {error || "正在打开问卷…"}
+          </p>
+          {!error && (
+            <div className="skeleton-rows">
+              <SkeletonLine width="min(480px, 80%)" height={40} />
+              <SkeletonLine />
+              <SkeletonLine width="72%" />
+            </div>
+          )}
         </section>
         {loadFailed && (
           <button
@@ -1153,6 +1164,7 @@ export default function Survey({
       attempt.current = null;
       pendingId.current = null;
       setUncertain(false);
+      toast.success(result.message || "回答已保存。");
       setSuccess({
         message: result.message || "回答已保存。",
         completion: result.completion,
@@ -1166,6 +1178,7 @@ export default function Survey({
     } catch (e) {
       if (lifecycle.current !== visit) return;
       setError(e.message);
+      toast.error(e.message);
       const unknown =
         e.code === "INVALID_RESPONSE" ||
         !e.status ||

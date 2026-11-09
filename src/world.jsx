@@ -10,6 +10,7 @@ import {
 import { date } from "./api";
 import { cluster } from "./map-utils";
 import { subscribeTheme } from "./theme-state.js";
+import SegmentedControl from "./segmented-control.jsx";
 export { cluster } from "./map-utils";
 export default function World({ stories = [], onPick, pick, compact = false }) {
   const mount = useRef(null),
@@ -233,24 +234,23 @@ export default function World({ stories = [], onPick, pick, compact = false }) {
   return (
     <div className={"world " + (compact ? "compact" : "")}>
       <div className="world-toolbar">
-        <div className="segmented">
-          <button
-            type="button"
-            className={!flat ? "selected" : ""}
-            aria-pressed={!flat}
-            onClick={() => setFlat(false)}
-          >
-            <GlobeHemisphereEast /> 地球
-          </button>
-          <button
-            type="button"
-            className={flat ? "selected" : ""}
-            aria-pressed={flat}
-            onClick={() => setFlat(true)}
-          >
-            <MapTrifold /> 平面地图
-          </button>
-        </div>
+        <SegmentedControl
+          label="地图显示方式"
+          value={flat ? "flat" : "globe"}
+          onChange={(value) => setFlat(value === "flat")}
+          options={[
+            {
+              value: "globe",
+              label: "地球",
+              icon: <GlobeHemisphereEast aria-hidden="true" />,
+            },
+            {
+              value: "flat",
+              label: "平面地图",
+              icon: <MapTrifold aria-hidden="true" />,
+            },
+          ]}
+        />
         <span>
           {onPick
             ? "点击地图选择精确位置"
